@@ -207,7 +207,7 @@ scene.fog=new THREE.Fog(0xf6f3e9,150,340);
 const hemi=new THREE.HemisphereLight(0xdfeee0,0xcbb98f,0.95); scene.add(hemi);
 const sun=new THREE.DirectionalLight(0xfff2d8,1.05); sun.position.set(-60,80,40); scene.add(sun);
 const cam=new THREE.OrthographicCamera(-1,1,1,-1,1,600);
-const camState={tx:0,ty:2,tz:0,az:-2.01,el:0.62,size:34};
+const camState={tx:0,ty:2,tz:0,az:-1.57,el:0.62,size:34};
 const camGoal={...camState};
 function applyCam(){
   const {tx,ty,tz,az,el,size}=camState;
@@ -567,7 +567,7 @@ document.querySelectorAll('.occ button').forEach(b=>b.addEventListener('click',(
   curOcc=(curOcc===b.dataset.occ)?null:b.dataset.occ; applyOcc();
 }));
 const VIEWS={
-  all:{lon:107.037,lat:23.1485,size:30,az:-2.01,el:0.80,label:'全景'},
+  all:{lon:107.0307,lat:23.1516,size:16,az:-1.57,el:0.80,label:'全景'},
   chuji:{lon:107.02533,lat:23.15011,size:11,az:-1.54,el:0.62,label:'初脊峰'},
   jianban:{lon:107.02903,lat:23.15027,size:11,az:-0.89,el:0.62,label:'剑板峰'},
   tianzhu:{lon:107.03117,lat:23.152,size:11,az:-1.05,el:0.62,label:'天柱峰 ★'},

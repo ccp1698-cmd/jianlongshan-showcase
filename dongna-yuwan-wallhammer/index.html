@@ -5,13 +5,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="icon" href="data:," />
     <title>峒那屿湾 · Wallhammer 版（v1 原型）</title>
-    <style>html,body{background:#8fb2c9;height:100%;margin:0;font-family:-apple-system,PingFang SC,Microsoft YaHei,sans-serif;overflow:hidden}canvas#view{touch-action:none;cursor:grab;width:100vw;height:100vh;display:block}canvas#view.dragging{cursor:grabbing}.panel{z-index:10;color:#223;background:#ffffffeb;border-radius:12px;padding:10px 12px;font-size:13px;position:fixed;box-shadow:0 2px 12px #00000040}.panel h1{margin:0 0 2px;font-size:16px}.panel h2{margin:8px 0 4px;font-size:13px}.sub{color:#667;font-size:12px}#left{width:218px;top:12px;left:12px}#right{flex-direction:column;width:264px;max-height:calc(100vh - 24px);display:flex;top:12px;right:12px}#chat{width:340px;bottom:12px;left:12px}.row{flex-wrap:wrap;gap:6px;margin:4px 0;display:flex}button{cursor:pointer;color:#223;background:#fff;border:1px solid #b9c4cc;border-radius:8px;padding:5px 9px;font-size:13px}button:hover{background:#eef4f7}button.active{color:#fff;background:#2f6f8f;border-color:#2f6f8f}input[type=text],input[type=search]{box-sizing:border-box;border:1px solid #b9c4cc;border-radius:8px;width:100%;padding:6px 8px;font-size:13px}input[type=range]{width:100%}#wpList{border-top:1px solid #dde4e8;flex:auto;min-height:80px;margin-top:6px;overflow-y:auto}.wp{cursor:pointer;border-bottom:1px solid #eef2f4;padding:6px 4px}.wp:hover{background:#eef4f7}.wp .tag{float:right;color:#888;font-size:11px}.wp .kind-fac{color:#b06a00}#infoCard{border-top:1px solid #dde4e8;margin-top:6px;padding-top:6px}#infoCard h3{margin:0 0 4px;font-size:14px}#infoCard p{color:#334;margin:0;font-size:12.5px;line-height:1.55}#chatLog{max-height:120px;margin:6px 0;font-size:12.5px;line-height:1.5;overflow-y:auto}#chatLog .q{color:#2f6f8f}#chatLog .a{color:#334;margin-bottom:6px}#chatRow{gap:6px;display:flex}#chatRow input{flex:1}.foot{color:#778;margin-top:6px;font-size:11px;line-height:1.5}#stats{color:#667;margin-top:6px;font-size:11px}</style>
-    <script type="module" crossorigin src="./assets/index-DX2Gmf1n.js"></script>
+    <style>html,body{background:#8fb2c9;height:100%;margin:0;font-family:-apple-system,PingFang SC,Microsoft YaHei,sans-serif;overflow:hidden}canvas#view{touch-action:none;cursor:grab;width:100vw;height:100vh;display:block}canvas#view.dragging{cursor:grabbing}.panel{z-index:10;color:#223;background:#ffffffeb;border-radius:12px;padding:10px 12px;font-size:13px;position:fixed;box-shadow:0 2px 12px #00000040}.panel h1{margin:0 0 2px;font-size:16px}.panel h2{margin:8px 0 4px;font-size:13px}.sub{color:#667;font-size:12px}#left{width:218px;top:12px;left:12px}#right{flex-direction:column;width:264px;max-height:calc(100vh - 24px);display:flex;top:12px;right:12px}#chat{width:340px;bottom:12px;left:12px}.row{flex-wrap:wrap;gap:6px;margin:4px 0;display:flex}button{cursor:pointer;color:#223;background:#fff;border:1px solid #b9c4cc;border-radius:8px;padding:5px 9px;font-size:13px}button:hover{background:#eef4f7}button.active{color:#fff;background:#2f6f8f;border-color:#2f6f8f}input[type=text],input[type=search]{box-sizing:border-box;border:1px solid #b9c4cc;border-radius:8px;width:100%;padding:6px 8px;font-size:13px}input[type=range]{width:100%}#wpList{border-top:1px solid #dde4e8;flex:auto;min-height:80px;margin-top:6px;overflow-y:auto}.wp{cursor:pointer;border-bottom:1px solid #eef2f4;padding:6px 4px}.wp:hover{background:#eef4f7}.wp .tag{float:right;color:#888;font-size:11px}.wp .kind-fac{color:#b06a00}#infoCard{border-top:1px solid #dde4e8;margin-top:6px;padding-top:6px}#infoCard h3{margin:0 0 4px;font-size:14px}#infoCard p{color:#334;margin:0;font-size:12.5px;line-height:1.55}#chatLog{max-height:120px;margin:6px 0;font-size:12.5px;line-height:1.5;overflow-y:auto}#chatLog .q{color:#2f6f8f}#chatLog .a{color:#334;margin-bottom:6px}#chatRow{gap:6px;display:flex}#chatRow input{flex:1}.foot{color:#778;margin-top:6px;font-size:11px;line-height:1.5}#stats{color:#667;margin-top:6px;font-size:11px}#mobileBar,#mobileInfo,.panel .closeBtn{display:none}@media (width<=760px){#mobileBar{z-index:20;color:#223;background:#fffffff0;border-radius:12px;align-items:center;gap:6px;padding:8px 10px;display:flex;position:fixed;top:8px;left:8px;right:8px;box-shadow:0 2px 12px #00000040}#mobileBar .title{white-space:nowrap;text-overflow:ellipsis;flex:1;font-size:14px;font-weight:700;overflow:hidden}#mobileBar button{flex:none}#left,#right,#chat{display:none}#left.open,#chat.open{width:auto;max-height:58vh;display:block;inset:auto 8px 8px;overflow-y:auto}#right.open{width:auto;max-height:62vh;display:flex;inset:auto 8px 8px}.panel .closeBtn{float:right;margin:-2px -4px 4px 8px;display:inline-block}#mobileInfo.show{z-index:15;color:#223;background:#fffffff0;border-radius:12px;align-items:flex-start;gap:8px;max-height:30vh;padding:10px 12px;font-size:13px;line-height:1.5;display:flex;position:fixed;bottom:8px;left:8px;right:8px;overflow-y:auto;box-shadow:0 2px 12px #00000040}#mobileInfo strong{flex:none}#mobileInfo span{color:#334;flex:1}#mobileInfo button{flex:none}}</style>
+    <script type="module" crossorigin src="./assets/index-CFVMtopo.js"></script>
   </head>
   <body>
     <canvas id="view"></canvas>
 
+    <div id="mobileBar">
+      <span class="title">峒那屿湾 · Wallhammer 版</span>
+      <button data-panel="left">视角</button>
+      <button data-panel="right">景点</button>
+      <button data-panel="chat">问一问</button>
+    </div>
+
     <div class="panel" id="left">
+      <button class="closeBtn" data-close="left">✕ 收起</button>
       <h1>峒那屿湾 · Wallhammer 版</h1>
       <div class="sub">v1 原型 · 拖动旋转 · 滚轮缩放</div>
       <h2>视角</h2>
@@ -25,12 +33,14 @@
     </div>
 
     <div class="panel" id="right">
+      <button class="closeBtn" data-close="right">✕ 收起</button>
       <input type="search" id="wpSearch" placeholder="搜索景点 / 设施，如 龙碧滩、码头、卫生间" />
       <div id="wpList"></div>
       <div id="infoCard"><h3>欢迎来到峒那屿湾</h3><p>点击左侧视角或右侧列表中的地点，飞过去看看。黑水河自西向东流过安平村，游船从岜零码头出发。</p></div>
     </div>
 
     <div class="panel" id="chat">
+      <button class="closeBtn" data-close="chat">✕ 收起</button>
       <div><strong>问一问</strong> <span class="sub">（v1 简易版：关键词匹配景点介绍，非完整助手）</span></div>
       <div id="chatLog"></div>
       <div id="chatRow">
@@ -39,6 +49,8 @@
       </div>
       <div class="foot">数据来源：景区官方导视图 + v15 地形（DEM），Wallhammer v1 原型，与 v15 Three.js 版并行，不替代它；票价时间以景区当日公示为准。</div>
     </div>
+
+    <div id="mobileInfo"><strong id="miTitle"></strong><span id="miText"></span><button id="miClose">✕</button></div>
 
   </body>
 </html>

@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>剑龙山 · 3D 地图（Procedural Terrains 新版 v1）</title>
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#0b1220;font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif}
+  canvas{display:block}
+  #title{position:fixed;left:12px;top:12px;color:#fff;background:rgba(10,20,35,.62);padding:10px 14px;border-radius:10px;max-width:340px;z-index:5}
+  #title h1{margin:0;font-size:17px;line-height:1.35}
+  #title p{margin:4px 0 0;font-size:12px;line-height:1.5;color:#cfe0ef}
+  #title .tag{display:inline-block;margin-top:6px;font-size:11px;background:#2f7fc4;color:#fff;border-radius:20px;padding:2px 8px}
+  #views{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);display:flex;gap:6px;flex-wrap:wrap;justify-content:center;max-width:96vw;z-index:5}
+  #views button{border:1px solid rgba(255,255,255,.35);background:rgba(10,20,35,.66);color:#fff;font-size:13px;padding:7px 12px;border-radius:20px;cursor:pointer;white-space:nowrap}
+  #views button.active{background:#2f7fc4;border-color:#2f7fc4}
+  #legend{position:fixed;left:12px;bottom:14px;color:#fff;background:rgba(10,20,35,.62);padding:8px 10px;border-radius:8px;font-size:12px;line-height:1.7;z-index:5}
+  #legend i{display:inline-block;width:18px;height:4px;border-radius:2px;vertical-align:middle;margin-right:6px}
+  #status{position:fixed;right:12px;bottom:14px;color:#cfe0ef;background:rgba(10,20,35,.55);padding:6px 8px;border-radius:8px;font-size:11px;line-height:1.5;max-width:300px;z-index:5}
+  .lbl{position:absolute;transform:translate(-50%,-100%);pointer-events:none;white-space:nowrap;z-index:4;
+    background:rgba(10,20,35,.78);color:#fff;border:1px solid rgba(255,255,255,.45);border-radius:20px;
+    padding:3px 10px;font-size:13px;line-height:1.4}
+  .lbl small{color:#ffd27f}
+  .lbl.water{background:rgba(23,90,140,.82);border-color:rgba(255,255,255,.5)}
+  .lbl::after{content:"";position:absolute;left:50%;bottom:-5px;transform:translateX(-50%);
+    border:5px solid transparent;border-top-color:rgba(10,20,35,.78);border-bottom:0}
+  @media (max-width:640px){
+    #title{max-width:250px;padding:8px 10px}#title h1{font-size:15px}
+    #legend{display:none}
+    #status{display:none}
+  }
+</style>
+  <script type="module" crossorigin src="./assets/index-UCdl9ZmM.js"></script>
+</head>
+<body>
+<div id="title">
+  <h1>剑龙山 · 3D 地图</h1>
+  <p>Procedural Terrains 新版 v1 · 真实 DEM 地形<br>定位、聊天助手下一阶段加入</p>
+  <span class="tag">v1 试制版</span>
+</div>
+<div id="labels"></div>
+<div id="views"></div>
+<div id="legend">
+  <div><i style="background:#e0651f"></i>徒步路线（穿四峰）</div>
+  <div><i style="background:#9aa0a6"></i>公路</div>
+  <div><i style="background:#2f7fc4"></i>伏曼水库</div>
+  <div><i style="background:#5a9a45"></i>农田</div>
+</div>
+<div id="status">加载中…</div>
+</body>
+</html>

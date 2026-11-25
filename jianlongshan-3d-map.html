@@ -222,7 +222,7 @@ a{color:#9fc6a8;text-underline-offset:2px}
     <b>四季</b> —— 崇左属亚热带湿润季风区，年均 21–22℃，无霜期 330 天以上，年雨量约 1200 mm，雨季 4–9 月占全年近八成，春季多干旱：这里是“长夏无冬、四季常青”，所以不用温带春夏秋冬。<a href="https://www.weather.com.cn/cityintro/101300201.shtml" target="_blank" rel="noopener">中国天气网 · 崇左城市介绍 ↗</a><br>
   </div>
   <div class="foot">
-    地形：SRTM / Terrarium DEM · 山路：© OpenStreetMap contributors (ODbL) · 画风与结构：Pocket City Skill（April Zhu，MIT）· 树木放大 ×4 以便看清 · 山脊最高 730 m（天柱峰）· 微缩模型 v2.10.9 · <span>3D 模型：Polyfork（CC BY 4.0）</span> <button id="attrToggle" type="button">查看完整署名</button>
+    地形：SRTM / Terrarium DEM · 山路：© OpenStreetMap contributors (ODbL) · 画风与结构：Pocket City Skill（April Zhu，MIT）· 树木放大 ×4 以便看清 · 山脊最高 730 m（天柱峰）· 微缩模型 v2.10.10 · <span>3D 模型：Polyfork（CC BY 4.0）</span> <button id="attrToggle" type="button">查看完整署名</button>
     <div id="attrFull" hidden>3D 模型（CC BY 4.0）：Rammed-Earth Farmhouse by Polyfork (https://polyfork.dev/asset/rammed-earth-farmhouse-6432fc), CC BY 4.0；Gabled Farmhouse by Polyfork (https://polyfork.dev/asset/gabled-farmhouse-c7534f), CC BY 4.0；Thatched Cottage by Polyfork (https://polyfork.dev/asset/thatched-cottage-0e63f5), CC BY 4.0；Log Cabin by Polyfork (https://polyfork.dev/asset/log-cabin-4fac3b), CC BY 4.0；Timber Barn by Polyfork (https://polyfork.dev/asset/timber-barn-90b3ce), CC BY 4.0；Market Stall by Polyfork (https://polyfork.dev/asset/market-stall-9d0b29), CC BY 4.0；Town Car by Polyfork (https://polyfork.dev/asset/town-car-56eeb6), CC BY 4.0；Scout Jeep by Polyfork (https://polyfork.dev/asset/scout-jeep-c02efe), CC BY 4.0；Family Minivan by Polyfork (https://polyfork.dev/asset/family-minivan-924de0), CC BY 4.0；Horse by Polyfork (https://polyfork.dev/asset/horse-base), CC BY 4.0；Cow by Polyfork (https://polyfork.dev/asset/cow-base), CC BY 4.0；Sheep by Polyfork (https://polyfork.dev/asset/sheep-base), CC BY 4.0；Red Fox by Polyfork (https://polyfork.dev/asset/red-fox-5c3bc0), CC BY 4.0；Wooden Rowboat by Polyfork (https://polyfork.dev/asset/wooden-rowboat-916981), CC BY 4.0；Dock Platform Section by Polyfork (https://polyfork.dev/asset/dock-platform-section-b36e7c), CC BY 4.0；Trail Signpost by Polyfork (https://polyfork.dev/asset/trail-signpost-bd29a7), CC BY 4.0</div>
   </div>
 </div>
@@ -594,8 +594,8 @@ function panoView(){const p=(window.innerWidth||800)/Math.max(1,window.innerHeig
 // the entrance + plaza lower-centre, the road + village houses at the
 // bottom, the trail vertical on the right. Size must stay <=30 — at 32
 // the waypoints hide and 凤鸣坡/拜山/息穹坡 drop out of the frame.
-const ENTRANCE_PORT={lon:107.0375,lat:23.1560,size:44,az:1.5,el:0.7}; // v2.10.6: re-tuned to ref-entrance-view-v3.jpg (RMS 2.56, 9 labels; was v2.10.3 {107.0390,23.1570,size:30,az:2.02,el:0.62})
-const ENTRANCE_LAND={lon:107.0375,lat:23.1565,size:50,az:1.5,el:0.7}; // v2.10.6: same view direction as portrait; target nudged north + size 50 so the lake clears the dock in landscape (peaks still bunch slightly — geometric limit, see BUILD-NOTES)
+const ENTRANCE_PORT={lon:107.041,lat:23.1583,size:15,az:2.3,el:0.8}; // v2.10.10: refit to the user's screenshot work/ref-entrance-view.jpg (RMS 0.6, 8 keys; centre E 107.041,23.1583 — the 2e interpolation between B 3.4 and C 5.1; was v2.10.6 {107.0375,23.1560,size:44,az:1.5,el:0.7})
+const ENTRANCE_LAND={lon:107.041,lat:23.1583,size:17,az:2.3,el:0.8}; // v2.10.10: same centre/direction as portrait; size 17 = 15 x the v2.10.6 LAND/PORT ratio (50/44), so the cluster keeps its framing in landscape (not separately fitted)
 function entranceView(){const p=(window.innerWidth||800)/Math.max(1,window.innerHeight||600)<0.9;return p?ENTRANCE_PORT:ENTRANCE_LAND;}
 const _dv=defaultView(), _dvXZ=sceneOf(_dv.lon,_dv.lat), _dvFull=_dv.size===60;
 // v2.10: opening animation (user: the page opens on view A, then flies to
@@ -1543,11 +1543,11 @@ document.querySelectorAll('.occ button').forEach(b=>b.addEventListener('click',(
 const VIEWS={
   all:{lon:107.0365,lat:23.1550,size:35,az:1.45,el:0.40,label:'全景'},  // v2.10.7: panorama re-tuned to ref-panorama-v3.jpg (RMS 3.6; portrait params; landscape uses PANO_LAND via panoView())
   bird:{lon:107.0365,lat:23.1550,size:38,az:0,el:1.45,label:'鸟瞰'},  // v2.10.9: top-down overview, north-up; the views panel lists it automatically (Object.entries(VIEWS))
-  chuji:{lon:107.037714,lat:23.157713,size:11,az:-1.54,el:0.62,label:'初脊峰'},
-  jianban:{lon:107.03691,lat:23.155449,size:11,az:-0.89,el:0.62,label:'剑板峰'},
-  tianzhu:{lon:107.035693,lat:23.154711,size:20,az:-1.9,el:0.15,label:'天柱峰 ★'},  // v2.10.9: refit to the user's screenshot work/ref-tianzhu-view.jpg (RMS 3.2, 9 labels; was size 11, az -1.05, el 0.62). el 0.15 is a flyTo target, below the drag clamp [0.21,1.29] (same as bird's-eye 1.45 above it); a vertical drag after tapping it glides el to >=0.21.
-  guiyuan:{lon:107.036044,lat:23.153116,size:11,az:2.09,el:0.62,label:'归元峰'},
-  entrance:{lon:107.0375,lat:23.1560,size:44,az:1.5,el:0.7,label:'入口'},  // v2.10.6: re-tuned to ref-entrance-view-v3.jpg (portrait params; landscape uses ENTRANCE_LAND via entranceView())
+  chuji:{lon:107.037714,lat:23.157713,size:11,az:-1.54,el:0.62,label:'1号峰 初脊峰'},  // v2.10.10: view buttons numbered 1/2/3/5 (user 2026-11-25) — button text only, map labels untouched
+  jianban:{lon:107.03691,lat:23.155449,size:11,az:-0.89,el:0.62,label:'2号峰 剑板峰'},
+  tianzhu:{lon:107.035693,lat:23.154911,size:11,az:-2.5,el:0.8,label:'3号峰 天柱峰 ★'},  // v2.10.10: refit to the user's NEW screenshot work/ref-tianzhu-view-v2.jpg (RMS 2.0, 8 labels; centre moved +0.0002 lat from the peak — the peak label lands at 57.8,25.2 only with this offset; was v2.10.9 {107.035693,23.154711,size:20,az:-1.9,el:0.15} from the 20:28 screenshot, RMS 3.2). Note: 势崖道 does not exist — the waypoint is 劈崖道; the v2 fit first mis-keyed it and the RMS was inflated by the 60^2 MISS until corrected.
+  guiyuan:{lon:107.035944,lat:23.153216,size:15,az:-2.2,el:0.45,label:'5号峰 归元峰'},  // v2.10.10: refit to the user's screenshot work/ref-guiyuan-view.jpg (RMS 1.6, 7 labels; centre moved -0.0001 lon/+0.0001 lat from the peak; was {107.036044,23.153116,size:11,az:2.09,el:0.62}). 伏山·补给站 is occluded from the south side (az -2.5..-3.0) and only appears from az ~ -2.2; the west camera (az -1.57) throws 天柱峰 off-screen.
+  entrance:{lon:107.041,lat:23.1583,size:15,az:2.3,el:0.8,label:'入口'},  // v2.10.10: refit to work/ref-entrance-view.jpg (portrait params; landscape uses ENTRANCE_LAND via entranceView())
   parkexit:{lon:107.041103,lat:23.156366,size:12,az:1.88,el:0.62,label:'出口'}, // v2.9.8: KML position (emergency-passage start; v2.7.1 red-circle location superseded)
   lake:{lon:107.04537,lat:23.15256,size:12,az:0,el:0.62,label:'水库'}
 };
@@ -1799,6 +1799,22 @@ let dragging=false; // v2.10.9: single-finger drag active — tick() damps az/el
     const u=-dxPx*px, v=-dyPx*px/Math.max(0.3,se);
     return [u*Math.cos(az)+v*Math.sin(az), -u*Math.sin(az)+v*Math.cos(az)];
   }
+  // v2.10.10: FLAT two-finger drag pan — the exact-tracking panDelta
+  // divides the vertical component by max(0.3,sin(el)), so at low el the
+  // vertical pan runs 2.5-3.3x the horizontal rate and the map slides
+  // away when panning south ("挪到最底下的时候滑得很快"). The drag pan
+  // now moves the target at the same world-units-per-pixel vertically as
+  // horizontally (H/V speeds equal at any el); the zoom/wheel anchor
+  // terms keep the exact panDelta (they must keep the point under the
+  // cursor fixed while size changes).
+  function panByScreenFlat(dxPx,dyPx){
+    const h=canvas.clientHeight;
+    const px=2*camGoal.size/Math.max(1,h);
+    const az=camGoal.az;
+    const u=-dxPx*px, v=-dyPx*px;
+    camGoal.tx=Math.max(-60,Math.min(60,camGoal.tx+u*Math.cos(az)+v*Math.sin(az)));
+    camGoal.tz=Math.max(-45,Math.min(45,camGoal.tz-u*Math.sin(az)+v*Math.cos(az)));
+  }
   // damped path (wheel / pinch anchor): move the GOAL only; tick() damps camState toward it
   function panByScreen(dxPx,dyPx){
     const d=panDelta(dxPx,dyPx,camGoal);
@@ -1864,7 +1880,11 @@ let dragging=false; // v2.10.9: single-finger drag active — tick() damps az/el
       // owns el so there is only one pitch control). The midpoint
       // delta moves the map with the fingers; the zoom-anchor term
       // above keeps the point under the midpoint fixed as size changes.
-      panByScreen(mx-pinchMidX, my-pinchMidY);
+      // v2.10.10: the midpoint drag pans FLAT (panByScreenFlat) — same
+      // world-units-per-pixel vertically as horizontally, so panning
+      // south at low el no longer slides away; the zoom-anchor term
+      // above keeps the exact panDelta.
+      panByScreenFlat(mx-pinchMidX, my-pinchMidY);
       pinchMidX=mx; pinchMidY=my;
       pinchD=d; pinchA=a; return;
     }
@@ -1991,6 +2011,18 @@ function updateMarkers(){
   // skip would then freeze in place. (Latent since v2.10.2: there the
   // next tick's update healed it, so it never showed.)
   cam.updateMatrixWorld();
+  // v2.10.10: flagpole clearance segments (screen space) — a waypoint
+  // whose pill would sit on a summit flagpole gets the minimum
+  // horizontal nudge to clear it (see below). A pole is the vertical
+  // segment from the summit ground point to the flag top (+3.4 units).
+  const _poles=[];
+  for(const pk of DATA.peaks){
+    const [pxx,pzz]=sceneOf(pk.lon,pk.lat); const py=yOf(demAt(pk.lon,pk.lat));
+    v3.set(pxx,py+3.4,pzz).project(cam);
+    const _pTopY=(-v3.y*0.5+0.5)*h;
+    v3.set(pxx,py,pzz).project(cam);
+    if(v3.z<=1)_poles.push({x:(v3.x*0.5+0.5)*w,yTop:Math.min(_pTopY,(-v3.y*0.5+0.5)*h),yBot:Math.max(_pTopY,(-v3.y*0.5+0.5)*h)});
+  }
   // v1.3.5: label offsets shrink when zoomed in, so a label sits on its point
   // instead of floating far away (s = 1 at the default zoom, 0.2 at max zoom).
   // The yOff lift is a fixed pixel amount (its size-40 screen height), not a
@@ -2054,8 +2086,28 @@ function updateMarkers(){
     // transform (the CSS .marker transform is removed).
     // v2.10: stagger cancelled — no sx/sy offsets, no leader lines; the
     // label sits directly above its anchor (dx/dy + lift only).
-    const lx=(v3.x*0.5+0.5)*w+(m.dx||0)*s;
+    const lx0=(v3.x*0.5+0.5)*w+(m.dx||0)*s;
     const ly=(-v3.y*0.5+0.5)*h+(m.dy||0)*s-liftPx;
+    // v2.10.10: pole clearance — 脊生扶桑 sits 7 m from the 初脊峰
+    // summit, so at close range its pill is centred on the pole base
+    // (user 2026-11-25, work/ref-jishengfusang-moved.jpg; v2.10.8 vs
+    // v2.10.9 rendered at the same camera are pixel-identical, so the
+    // position never moved — it is the overlap, not a move). The anchor
+    // stays directly above its point (v2.10.3); only when a waypoint
+    // pill actually overlaps a pole segment is it shifted horizontally
+    // by the minimum to clear (pill half-width + 3 px), to the nearer
+    // side. Recorded on m._poleNudge (0 when none) for the tests.
+    let lx=lx0, _nudge=0;
+    if(isWp){
+      if(m._hw===undefined){m._hw=m.el.offsetWidth/2;m._hh=m.el.offsetHeight;}
+      for(const pl of _poles){
+        if(Math.abs(lx-pl.x)<m._hw+3&&ly>pl.yTop-2&&ly-m._hh<pl.yBot+2){
+          _nudge=lx>=pl.x?(pl.x+m._hw+3-lx):(pl.x-m._hw-3-lx);
+          lx+=_nudge; break;
+        }
+      }
+    }
+    m._poleNudge=_nudge;
     m.el.style.transform='translate3d('+lx.toFixed(1)+'px,'+ly.toFixed(1)+'px,0) translate(-50%,-100%)';
   });
 }

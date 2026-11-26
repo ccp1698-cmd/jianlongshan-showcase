@@ -2,8 +2,8 @@
 // 地形是我们的真实 DEM（136×144），高度真实、无竖向夸张；
 // 四峰标签用 KML 高程（用户已定）；农田不画贴片——卫星图上本来就是真农田。
 // v2（2026-11-26）：范围缩到 20km + 第二阶段全部功能（按 v2.10.11 搬过来：
-// 定位、景区小助理、672 棵树、6 村子、3 停车场、3 设施、补给站标签、13 途点、
-// 40 徒步者、四季云雾、水坝、四峰旗帜、UI/排版）。
+// 定位、景区小助理、6 村子、3 停车场、3 设施、补给站标签、13 途点、
+// 40 徒步者、四季（人数/雨）、四峰旗帜、UI/排版）。
 import { DATA } from './data.js';
 
 const $ = (id) => document.getElementById(id);
@@ -112,11 +112,9 @@ try {
   // 宽屏仍 1.5。本地 SwiftShader 帧率不代表手机，只看瓦片数/分辨率等可量化指标。
   const dprCap = isNarrow ? 1.0 : 1.5;
   viewer.resolutionScale = Math.min(window.devicePixelRatio || 1, dprCap);
-  // 雾：v2 起按四季开（见 applySeason）。上一轮关雾是把它当成每帧后处理；
-  // 实测 Cesium 的雾只是地形片元着色器里的一项（density²×距离² 的指数雾），
-  // 不是额外渲染通道；窄屏 DPR 1.0 + 拖动 msse 4 仍在，雾的开销可忽略。
+  // 雾已关（用户要求去掉）：Cesium 内置 scene.fog 关闭，季节不再调雾密度。
   // 大气散射仍关（每帧算，贵；预设视角俯角大，天空基本不出画）。
-  viewer.scene.fog.enabled = true;
+  viewer.scene.fog.enabled = false;
   viewer.scene.skyAtmosphere.show = false; // 大气散射每帧算，关掉；天空用底色（见 index.html 背景）
   // 窄屏静止时 msse 3（宽屏仍 2）：少拉一档瓦片；拖动时仍 4
   const REST_MSSE = isNarrow ? 3 : 2;
@@ -220,9 +218,8 @@ try {
     labelItems.push({ entity: e, anchor: pos, tier: 'A', main: false, halfW: 75, halfH: 13, dy: -30 });
   }
 
-  // ---------- 地面高程采样：树/途点/设施/村子/徒步环线/雨滴，一次批量取 ----------
+  // ---------- 地面高程采样：途点/设施/村子/徒步环线/雨滴，一次批量取 ----------
   // 用显示的地形本身采样（与峰高核对同一调用），点位落点与地形一致。
-  const hash = (a, b) => { const s = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return s - Math.floor(s); };
   const haversineM = (a, b) => {
     const R = 6371000, dLa = (b[1] - a[1]) * Math.PI / 180, dLo = (b[0] - a[0]) * Math.PI / 180;
     const la1 = a[1] * Math.PI / 180, la2 = b[1] * Math.PI / 180;
@@ -249,7 +246,6 @@ try {
     sampleCarts.push(c);
     return c;
   };
-  const treeCarts = DATA.trees.map((t) => cartFor(t[0], t[1]));
   const wpCarts = DATA.waypoints.map((w) => cartFor(w.lon, w.lat));
   const parkCarts = DATA.parking.map((p) => cartFor(p.lon, p.lat));
   const facCarts = DATA.facilities.map((f) => cartFor(f.lon, f.lat));
@@ -267,7 +263,7 @@ try {
     log(`地面采样完成：${sampleCarts.length} 点`);
   } catch (e) {
     sampledOk = false;
-    log('地面采样失败（树/途点/徒步者暂不建）：' + e);
+    log('地面采样失败（途点/徒步者暂不建）：' + e);
   }
   const groundStats = { sampledOk, sampled: sampleCarts.length, trees: 0, hikers: 0, clouds: 0 };
   window.__groundStats = groundStats;
@@ -295,69 +291,6 @@ try {
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText('WC', x + s / 2, y + s / 2 + 1);
   };
-
-  // ---------- 树 672 棵：Pocket City 风格程序化卡通树，实例化批量画 ----------
-  // v2.10.11 的尺寸照搬（1 场景单位=21.71m，TREE_BOOST 1.4 已折进几何）：
-  // 云杉：锥 0.30r×0.85h（6 段）；阔叶：树干圆柱 + 压扁球冠（0.32r，纵向 ×0.85）。
-  // 3 个 InstancedMesh 等价物 = 3 个 Primitive（云杉/树干/树冠），共 3 次绘制。
-  // 季节换色 = 重建这 3 个 Primitive（实例颜色是静态顶点属性，改色只能重建，点一下才发生）。
-  const TREE = { coneH: 25.83, coneR: 9.12, trunkH: 9.73, trunkRT: 1.52, trunkRB: 2.13, crownR: 9.72 };
-  const TREE_OFF = { cone: 12.77, trunk: 4.86, crown: 16.72 };
-  let treePrims = [];
-  const enuMatrix = (lon, lat, h) => Cesium.Transforms.eastNorthUpToFixedFrame(Cesium.Cartesian3.fromDegrees(lon, lat, h));
-  const jitterColor = (hex, j) => Cesium.Color.fromCssColorString(hex).brighten(j, new Cesium.Color());
-  function buildTrees(seasonId) {
-    for (const p of treePrims) viewer.scene.primitives.remove(p);
-    treePrims = [];
-    if (!sampledOk) return;
-    const s = DATA.seasons[seasonId];
-    const spruceGeo = Cesium.CylinderGeometry.createGeometry(new Cesium.CylinderGeometry({
-      length: TREE.coneH, topRadius: 0.01, bottomRadius: TREE.coneR, radialSegments: 6 }));
-    const trunkGeo = Cesium.CylinderGeometry.createGeometry(new Cesium.CylinderGeometry({
-      length: TREE.trunkH, topRadius: TREE.trunkRT, bottomRadius: TREE.trunkRB, radialSegments: 5 }));
-    const crownGeo = Cesium.EllipsoidGeometry.createGeometry(new Cesium.EllipsoidGeometry({
-      radii: new Cesium.Cartesian3(TREE.crownR, TREE.crownR, TREE.crownR) }));
-    const spruceInst = [], trunkInst = [], crownInst = [];
-    const m4 = new Cesium.Matrix4();
-    DATA.trees.forEach((t, i) => {
-      if (isNarrow && i % 2 === 1) return; // 窄屏树减半：隔一取一，分布不变，仍实例化批量画
-      const h = treeCarts[i].height;
-      if (h === undefined) return;
-      const sc = t[3];
-      const base = enuMatrix(t[0], t[1], h);
-      if (t[2] === 'spruce') {
-        let m = Cesium.Matrix4.multiplyByTranslation(base, new Cesium.Cartesian3(0, 0, TREE_OFF.cone * sc), new Cesium.Matrix4());
-        m = Cesium.Matrix4.multiplyByScale(m, new Cesium.Cartesian3(sc, sc, sc), m);
-        spruceInst.push(new Cesium.GeometryInstance({
-          geometry: spruceGeo, modelMatrix: m,
-          attributes: { color: Cesium.ColorGeometryInstanceAttribute.fromColor(jitterColor(s.spruce, (hash(i, 3) - 0.5) * 0.08)) },
-        }));
-      } else {
-        let mt = Cesium.Matrix4.multiplyByTranslation(base, new Cesium.Cartesian3(0, 0, TREE_OFF.trunk * sc), new Cesium.Matrix4());
-        mt = Cesium.Matrix4.multiplyByScale(mt, new Cesium.Cartesian3(sc, sc, sc), mt);
-        trunkInst.push(new Cesium.GeometryInstance({
-          geometry: trunkGeo, modelMatrix: mt,
-          attributes: { color: Cesium.ColorGeometryInstanceAttribute.fromColor(Cesium.Color.fromCssColorString('#6b4a2f')) },
-        }));
-        let mc = Cesium.Matrix4.multiplyByTranslation(base, new Cesium.Cartesian3(0, 0, TREE_OFF.crown * sc), new Cesium.Matrix4());
-        mc = Cesium.Matrix4.multiplyByScale(mc, new Cesium.Cartesian3(sc, sc, sc * 0.85), mc);
-        const broad = s.broad[i % s.broad.length];
-        crownInst.push(new Cesium.GeometryInstance({
-          geometry: crownGeo, modelMatrix: mc,
-          attributes: { color: Cesium.ColorGeometryInstanceAttribute.fromColor(jitterColor(broad, (hash(i, 5) - 0.5) * 0.08)) },
-        }));
-      }
-    });
-    const app = () => new Cesium.PerInstanceColorAppearance({ flat: true });
-    for (const list of [spruceInst, trunkInst, crownInst]) {
-      if (!list.length) continue;
-      treePrims.push(viewer.scene.primitives.add(new Cesium.Primitive({
-        geometryInstances: list, appearance: app(), asynchronous: false,
-      })));
-    }
-    groundStats.trees = spruceInst.length + crownInst.length;
-    log(`树已建：云杉 ${spruceInst.length} + 阔叶 ${crownInst.length}（${seasonId}）`);
-  }
 
   // ---------- 标注点位：L1 地点 + 途点 + 停车场 + 村庄 ----------
   // 点位样式沿用 v2.10.11 的分级（L1 常显、L2/L3 缩小才显），但 Cesium 里按
@@ -468,62 +401,9 @@ try {
     });
   }
 
-  // ---------- 水坝：伏曼水库出水口，程序化梯形坝体（v2.10.11 的断面参数） ----------
-  // 下游坡 1:2.0 草绿、上游坡 1:0.8 混凝土、顶面深灰坝顶路；9 个断面放样。
-  // 注：坝顶 505m，DEM 在坝址处约 502–504m（SRTM 拍到了真坝体），坝体下半部
-  // 埋在地形里，只露上沿和下游坡下段——与 v2.10.11（DATA 里削过坝前地形）不同。
-  function loftGeometry(railA, railB) {
-    const n = railA.length;
-    const pos = new Float64Array(n * 2 * 3);
-    for (let i = 0; i < n; i++) {
-      pos[i * 3] = railA[i].x; pos[i * 3 + 1] = railA[i].y; pos[i * 3 + 2] = railA[i].z;
-      pos[(n + i) * 3] = railB[i].x; pos[(n + i) * 3 + 1] = railB[i].y; pos[(n + i) * 3 + 2] = railB[i].z;
-    }
-    const idx = [];
-    for (let i = 0; i < n - 1; i++) {
-      const a = i, b = i + 1, c = n + i, d = n + i + 1;
-      idx.push(a, c, b, b, c, d);
-    }
-    const geo = new Cesium.Geometry({
-      attributes: { position: new Cesium.GeometryAttribute({ componentDatatype: Cesium.ComponentDatatype.DOUBLE, componentsPerAttribute: 3, values: pos }) },
-      indices: new Uint16Array(idx),
-      primitiveType: Cesium.PrimitiveType.TRIANGLES,
-      boundingSphere: Cesium.BoundingSphere.fromPoints([...railA, ...railB]),
-    });
-    return Cesium.GeometryPipeline.computeNormal(geo);
-  }
-  function damFace(railA, railB, cssColor) {
-    viewer.scene.primitives.add(new Cesium.Primitive({
-      geometryInstances: new Cesium.GeometryInstance({
-        geometry: loftGeometry(railA, railB),
-        attributes: { color: Cesium.ColorGeometryInstanceAttribute.fromColor(Cesium.Color.fromCssColorString(cssColor)) },
-      }),
-      appearance: new Cesium.PerInstanceColorAppearance({ flat: true }),
-      asynchronous: false,
-    }));
-  }
-  {
-    const { A, axis, upstream, crest, halfM, stations } = DATA.dam;
-    const dn = [-upstream[0], -upstream[1]];
-    const pt = (s, dir, dist, h) => Cesium.Cartesian3.fromDegrees(
-      A[0] + ((axis[0] * s + dir[0] * dist) / 102000),
-      A[1] + ((axis[1] * s + dir[1] * dist) / 111000), h);
-    const crestDS = [], toeDS = [], crestUS = [], toeUS = [];
-    for (const [s, base] of stations) {
-      const H = Math.max(0, crest - base);
-      const yB = Math.min(base, crest);
-      crestDS.push(pt(s, dn, halfM, crest));
-      toeDS.push(pt(s, dn, halfM + 2.0 * H, yB));
-      crestUS.push(pt(s, upstream, halfM, crest));
-      toeUS.push(pt(s, upstream, halfM + 0.8 * H, yB));
-    }
-    damFace(crestDS, toeDS, '#7fae62'); // 下游草绿坡
-    damFace(crestUS, toeUS, '#d9d9d4'); // 上游混凝土坡
-    damFace(crestDS, crestUS, '#6f6f6a'); // 坝顶路
-    log('水坝已建：9 断面，顶 505m');
-  }
-
   // ---------- 四峰旗帜：旗杆（实例化圆柱）+ 红旗（盒子，慢速摆动） ----------
+  // 东北天向矩阵（原在建树块里定义，树删后移到这里——旗杆仍要用）。
+  const enuMatrix = (lon, lat, h) => Cesium.Transforms.eastNorthUpToFixedFrame(Cesium.Cartesian3.fromDegrees(lon, lat, h));
   // v2.10.11：旗杆 3.4 单位、旗面 1.10×0.68 单位、红旗飘扬；Cesium 里按真实米
   // 折算后杆约 49m、旗 24×10m，会顶到四峰标签锚点（gridH+40m）——为避让标签，
   // 杆取 30m、旗 20×6m，旗顶 27m、标签锚点仍在 40m，互不遮挡。
@@ -608,29 +488,6 @@ try {
     log(`徒步者已建：40 名，环线 ${Math.round(loopTotal)}m`);
   }
 
-  // ---------- 云 36 团：半透明球团，往复漂移（v2.10.11 同款） ----------
-  // 3D 椭球实体（不是公告板——云从各角度看都要有体积）；每团 6 个球，共 36 个。
-  // 高 919–991m（v2.10.11 的 y 31–36 单位按 live 文件 exag 1.5 换算），
-  // 水平 ±434m 往复，速度 9.8–14.1m/s。
-  const cloudEnts = [];
-  if (sampledOk) {
-    for (let ci = 0; ci < DATA.clouds.length; ci++) {
-      const c = DATA.clouds[ci];
-      if (isNarrow && ci % 2 === 1) continue; // 窄屏云减半（3 朵），效果保留
-      const puffs = c.puffs.map((pf) => viewer.entities.add({
-        position: Cesium.Cartesian3.fromDegrees(c.lon + pf.dLon, c.lat + pf.dLat, c.h + pf.dH),
-        ellipsoid: {
-          radii: new Cesium.Cartesian3(pf.rH, pf.rH, pf.rV),
-          material: Cesium.Color.WHITE.withAlpha(0.75),
-          outline: false,
-        },
-      }));
-      cloudEnts.push({ def: c, puffs, x: 0, dir: c.dir });
-    }
-    groundStats.clouds = cloudEnts.length;
-    log(`云已建：${cloudEnts.length} 朵 × 6 团`);
-  }
-
   // ---------- 雨：160 条雨丝（雨季才显示） ----------
   // 公告板竖线（不是每帧重建几何）：160 个小公告板，15fps 下落、触地回顶。
   const rainBoards = viewer.scene.primitives.add(new Cesium.BillboardCollection());
@@ -656,23 +513,18 @@ try {
     });
   }
 
-  // ---------- 四季：雾密度 / 树色 / 徒步者人数 / 雨 ----------
-  // 雾密度由 v2.10.11 的雾 near/far（米）换算：density=0.83/((near+far)/2)，
-  // 对应 Cesium 的 density²×距离² 指数雾——春 3.3km 起雾、5.6km 渐浓，以此类推。
+  // ---------- 四季：徒步者人数 / 雨 ----------
   let curSeason = 'spring';
   function applySeason(id) {
     if (!DATA.seasons[id]) return;
     curSeason = id;
     const s = DATA.seasons[id];
-    viewer.scene.fog.density = 0.83 / ((s.fogM[0] + s.fogM[1]) / 2);
-    buildTrees(id);
     rainBoards.show = (id === 'rain');
     const note = $('seasonNote');
     if (note) note.innerHTML = s.note + ' <a href="https://www.weather.com.cn/cityintro/101300201.shtml" target="_blank" rel="noopener">中国天气网 · 崇左 ↗</a>';
     document.querySelectorAll('#seasonChips .chip').forEach((b) => b.classList.toggle('on', b.dataset.season === id));
     window.__season = id;
-    window.__fogDensity = viewer.scene.fog.density;
-    log(`季节：${s.label}，雾密度 ${viewer.scene.fog.density.toFixed(6)}，徒步者 ${s.hikers} 名`);
+    log(`季节：${s.label}，徒步者 ${s.hikers} 名`);
     viewer.scene.requestRender();
   }
   window.__applySeason = applySeason;
@@ -1260,7 +1112,7 @@ try {
     b.addEventListener('click', () => applySeason(id));
     chipBox.appendChild(b);
   });
-  // ---------- 底图切换：只换影像层，相机/路线/标注/地形/树/云雾/季节全不动 ----------
+  // ---------- 底图切换：只换影像层，相机/路线/标注/地形/季节全不动 ----------
   // 切完视角保持原地（不碰相机）；当前风格存 localStorage，下次打开恢复。
   function setBasemap(id) {
     const style = BASEMAPS.find((b) => b.id === id);
@@ -1304,9 +1156,9 @@ try {
     obs.observe($('sheet-info'), { attributes: true, attributeFilter: ['hidden'] });
   }
 
-  // ---------- 动画：徒步者 / 云 / 旗 / 雨 / GPS 脉冲（15fps，便宜） ----------
+  // ---------- 动画：徒步者 / 旗 / 雨 / GPS 脉冲（15fps，便宜） ----------
   // 每 66ms 更新一次位置并请求一次渲染；静态时仍靠 requestRenderMode 省电，
-  // 但地图是“活”的（有人走、云在飘），所以持续以 15fps 渲染——手机上够用，
+  // 但地图是“活”的（有人走、旗在摆），所以持续以 15fps 渲染——手机上够用，
   // 拖动时的 DPR 1.0 + msse 4 优化仍在。
   let lastTick = Date.now();
   function tick() {
@@ -1327,16 +1179,6 @@ try {
         hk.umb.show = (curSeason === 'rain');
         hk.umb.position = Cesium.Cartesian3.fromDegrees(p.lon, p.lat, p.h + 7);
       }
-    }
-    for (const c of cloudEnts) {
-      c.x += c.def.v * c.dir * dt;
-      if (c.x > c.def.ampM) { c.x = c.def.ampM; c.dir = -1; }
-      else if (c.x < -c.def.ampM) { c.x = -c.def.ampM; c.dir = 1; }
-      const lon = c.def.lon + c.x / 102000;
-      c.puffs.forEach((ent, j) => {
-        const pf = c.def.puffs[j];
-        ent.position = Cesium.Cartesian3.fromDegrees(lon + pf.dLon, c.def.lat + pf.dLat, c.def.h + pf.dH);
-      });
     }
     for (const f of flagBoxes) {
       const h = 0.26 * Math.sin(t * 0.9 + f.phase); // ±15° 慢摆
@@ -1441,7 +1283,7 @@ try {
   }
   window.__restoredView = restoredView;
   window.__viewMemory = { key: VIEW_KEY, save: saveView, read: readSavedView };
-  applySeason('spring'); // 建树 + 雾密度（默认春）
+  applySeason('spring'); // 默认春
   declutterLabels();
   setInterval(tick, 66);
 
@@ -1455,7 +1297,6 @@ try {
     dprCap,
     maxScreenSpaceError: viewer.scene.globe.maximumScreenSpaceError,
     fogEnabled: viewer.scene.fog.enabled,
-    fogDensity: viewer.scene.fog.density,
     skyAtmosphere: viewer.scene.skyAtmosphere.show,
     maxZoomDistance: viewer.scene.screenSpaceCameraController.maximumZoomDistance,
     tileCacheSize: viewer.scene.globe.tileCacheSize,

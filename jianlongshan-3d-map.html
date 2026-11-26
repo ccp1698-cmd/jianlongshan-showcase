@@ -227,7 +227,7 @@ a{color:#9fc6a8;text-underline-offset:2px}
     <b>四季</b> —— 崇左属亚热带湿润季风区，年均 21–22℃，无霜期 330 天以上，年雨量约 1200 mm，雨季 4–9 月占全年近八成，春季多干旱：这里是“长夏无冬、四季常青”，所以不用温带春夏秋冬。<a href="https://www.weather.com.cn/cityintro/101300201.shtml" target="_blank" rel="noopener">中国天气网 · 崇左城市介绍 ↗</a><br>
   </div>
   <div class="foot">
-    地形：SRTM / Terrarium DEM · 山路：© OpenStreetMap contributors (ODbL) · 画风与结构：Pocket City Skill（April Zhu，MIT）· 树木放大 ×4 以便看清 · 山脊最高 730 m（天柱峰）· 微缩模型 v2.11.8 · <span>3D 模型：Polyfork（CC BY 4.0）</span> <button id="attrToggle" type="button">查看完整署名</button>
+    地形：SRTM / Terrarium DEM · 山路：© OpenStreetMap contributors (ODbL) · 画风与结构：Pocket City Skill（April Zhu，MIT）· 树木放大 ×4 以便看清 · 山脊最高 730 m（天柱峰）· 微缩模型 v2.11.9 · <span>3D 模型：Polyfork（CC BY 4.0）</span> <button id="attrToggle" type="button">查看完整署名</button>
     <div id="attrFull" hidden>3D 模型（CC BY 4.0）：Rammed-Earth Farmhouse by Polyfork (https://polyfork.dev/asset/rammed-earth-farmhouse-6432fc), CC BY 4.0；Gabled Farmhouse by Polyfork (https://polyfork.dev/asset/gabled-farmhouse-c7534f), CC BY 4.0；Thatched Cottage by Polyfork (https://polyfork.dev/asset/thatched-cottage-0e63f5), CC BY 4.0；Log Cabin by Polyfork (https://polyfork.dev/asset/log-cabin-4fac3b), CC BY 4.0；Timber Barn by Polyfork (https://polyfork.dev/asset/timber-barn-90b3ce), CC BY 4.0；Market Stall by Polyfork (https://polyfork.dev/asset/market-stall-9d0b29), CC BY 4.0；Town Car by Polyfork (https://polyfork.dev/asset/town-car-56eeb6), CC BY 4.0；Scout Jeep by Polyfork (https://polyfork.dev/asset/scout-jeep-c02efe), CC BY 4.0；Family Minivan by Polyfork (https://polyfork.dev/asset/family-minivan-924de0), CC BY 4.0；Horse by Polyfork (https://polyfork.dev/asset/horse-base), CC BY 4.0；Cow by Polyfork (https://polyfork.dev/asset/cow-base), CC BY 4.0；Sheep by Polyfork (https://polyfork.dev/asset/sheep-base), CC BY 4.0；Red Fox by Polyfork (https://polyfork.dev/asset/red-fox-5c3bc0), CC BY 4.0；Wooden Rowboat by Polyfork (https://polyfork.dev/asset/wooden-rowboat-916981), CC BY 4.0；Dock Platform Section by Polyfork (https://polyfork.dev/asset/dock-platform-section-b36e7c), CC BY 4.0；Trail Signpost by Polyfork (https://polyfork.dev/asset/trail-signpost-bd29a7), CC BY 4.0</div>
   </div>
 </div>
@@ -1748,26 +1748,49 @@ document.getElementById('locateBtn').addEventListener('click',()=>{if(geoWatch!=
    NEARBY is the data: {name, lon, lat, icon, grade, intro, loc}.
    Add a scenic area by appending one entry — no logic change needed.
    v2.11.5: FIXED ORDER (user 2026-11-26: "附近推荐里，第一个放峒那屿湾！
-   第二放伏那秘境") — the panel and the chat reply always list 峒那屿湾,
-   伏那秘境, 德天瀑布, 名仕田园 in NEARBY array order; GPS NEVER re-sorts
-   the list (locating only shows the blue dot). Distances are haversine
-   STRAIGHT-LINE distances from the Jianlongshan centre (107.0365,
-   23.1550) — never driving time, never from the GPS fix. 伏那秘境
-   coordinates are REAL since v2.11.7 (107.02, 22.86 — zjv.cn 崇左本地
-   事实库 GEO 问答卡, 2026-11-09; sources: 广西文化和旅游厅 / 大新县
-   文旅部门 / 恩城国家级自然保护区; only 2 decimals, ~1 km precision,
-   NOT a surveyed entrance point) — it shows its distance (~32.8 km)
-   like the other three. All four navigate by Amap NAME search
-   (v2.10.2 choice): the 伏那秘境 coordinates are only ~1 km
-   precise (2 decimals), so coordinate navigation could miss the
-   entrance by ~1 km, while name search resolves to Amap's exact
-   POI — see BUILD-NOTES (v2.11.7 correction: the first build
-   wrongly made 伏那秘境 coordinate-navigated). */
+   第二放伏那秘境") — the panel and the chat reply always list the
+   entries in NEARBY array order; GPS NEVER re-sorts the list (locating
+   only shows the blue dot). v2.11.9: the user adds 明仕那里酒店
+   (NALiVE) and puts it FIRST (user 2026-11-26 21:05, with a Tencent
+   Map screenshot of the hotel + its WeChat service account: "把这个
+   那里酒店放第一位！附近推荐里", then "NALiVE那里酒店") — the new
+   fixed order is 明仕那里酒店, 峒那屿湾, 伏那秘境, 德天瀑布.
+   The other three entries are byte-identical, only shifted one
+   place down. In the same round (user 2026-11-26 21:10) the fourth
+   entry was dropped, so the list is back to four entries — the
+   dropped entry (name/lon/lat/icon/grade/intro/loc) is deleted
+   entirely, no reference left anywhere in the code.
+   Distances are haversine STRAIGHT-LINE distances from the
+   Jianlongshan centre (107.0365, 23.1550) — never driving time,
+   never from the GPS fix. The hotel is NOT a scenic area: grade
+   is '' (like 伏那秘境), so its popup subtitle shows only the
+   distance; it navigates by Amap NAME search like the other
+   three. Hotel coordinates (106.9266, 22.7120 — chinaholiday.com
+   hotel map print page, Baidu map image URL carries Data/BMap/
+   106.926620949184,22.7119987962083.jpg, rounded to 4 decimals;
+   cross-check: ~880 m from the nearby Mingshi countryside scenic
+   spot, matching travel-site listings (~1.1 km); ~50.5 km from the
+   Jianlongshan centre). Address: 大新县堪圩乡明仕村村委会旧办公楼
+   (532 县道, 明仕小学旁). NALiVE is 华邦旅业's social hotel
+   brand, opened 2018, renovated 2022, 69 rooms. Name is
+   "明仕那里酒店" (the official name on Amap / Trip.com — name
+   search resolves to the exact POI); NALiVE lives in the intro.
+   伏那秘境 coordinates are REAL since v2.11.7 (107.02, 22.86 —
+   zjv.cn 崇左本地事实库 GEO 问答卡, 2026-11-09; sources: 广西
+   文化和旅游厅 / 大新县文旅部门 / 恩城国家级自然保护区; only
+   2 decimals, ~1 km precision, NOT a surveyed entrance point) —
+   it shows its distance (~32.8 km) like the others. All four
+   navigate by Amap NAME search (v2.10.2 choice): the 伏那秘境
+   coordinates are only ~1 km precise (2 decimals), so coordinate
+   navigation could miss the entrance by ~1 km, while name search
+   resolves to Amap's exact POI — see BUILD-NOTES (v2.11.7
+   correction: the first build wrongly made 伏那秘境
+   coordinate-navigated). */
 const NEARBY = [
+  {name:'明仕那里酒店', lon:106.9266, lat:22.7120, icon:'🏨', grade:'', intro:'NALiVE社交酒店，稻田泳池、落地窗推窗即景，明仕田园旁的度假住宿。', loc:'大新县堪圩乡明仕村'},
   {name:'峒那屿湾', lon:107.038, lat:22.713, icon:'🚢', grade:'国家 4A 级', intro:'黑水河畔水上幻境，画舫游船、婆皇岛、霞客栈道。', loc:'大新县雷平镇安平村'},
   {name:'伏那秘境', lon:107.02, lat:22.86, icon:'🌲', grade:'', intro:'喀斯特水上森林，雨林秘境穿越，丁达尔光森林漂流。', loc:'大新县恩城乡，恩城国家自然保护区内'},
   {name:'德天瀑布', lon:106.72278, lat:22.85583, icon:'💧', grade:'国家 5A 级', intro:'亚洲第一、世界第四大跨国瀑布，与越南板约瀑布相连，总宽 208 米。', loc:'大新县硕龙镇德天村，中越边境归春河上'},
-  {name:'名仕田园', lon:106.928515, lat:22.704285, icon:'🌾', grade:'国家 4A 级', intro:'喀斯特峰林田园，竹排漂流，《花千骨》取景地，号称小桂林。', loc:'大新县堪圩乡明仕村'},
 ];
 const JLS_CENTER = {lon:107.0365, lat:23.1550}; // 剑龙山景区中心 (no-GPS reference)
 function nearbyDistM(aLon,aLat,bLon,bLat){
@@ -1780,15 +1803,18 @@ function nearbyFmt(m){ return m<1000 ? '约 '+Math.round(m)+' 米' : '约 '+(m/1
 function nearbyRef(){
   // v2.11.5: FIXED ORDER — distances are ALWAYS from the Jianlongshan
   // centre; the GPS fix NEVER becomes the reference (user 2026-11-26:
-  // 峒那屿湾 first, 伏那秘境 second, fixed). userLoc still exists as
-  // GPS state (blue dot) but is no longer read here.
+  // v2.11.9 fixed order: 明仕那里酒店 first, then 峒那屿湾, 伏那秘境,
+  // 德天瀑布). userLoc still exists as GPS state (blue dot) but is no
+  // longer read here.
   return {lon:JLS_CENTER.lon, lat:JLS_CENTER.lat, gps:false};
 }
 function nearbySorted(){
   // v2.11.5: FIXED ORDER — NEARBY array order, no sort (was: nearest
   // first by distance from the GPS fix / centre). v2.11.7: every entry
   // now carries a real distance (伏那秘境 got real coordinates) — the
-  // old est -> Infinity special case is gone.
+  // old est -> Infinity special case is gone. v2.11.9: four entries,
+  // 明仕那里酒店 first (user 2026-11-26 21:05); the fourth entry
+  // removed in the same round (user 2026-11-26 21:10).
   const ref=nearbyRef();
   return NEARBY.map(s=>({s:s, d:nearbyDistM(ref.lon,ref.lat,s.lon,s.lat)}));
 }
@@ -1806,7 +1832,7 @@ function nearbyNavUrl(name){
 function nearbyOpenSpot(s){
   const ref=nearbyRef();
   const d=nearbyDistM(ref.lon,ref.lat,s.lon,s.lat);
-  const meta=(s.grade?s.grade+' · ':'')+nearbyFmt(d)+'（直线距离）'; // v2.11.7: every spot shows its distance (伏那秘境 grade is '' so its meta is just the distance)
+  const meta=(s.grade?s.grade+' · ':'')+nearbyFmt(d)+'（直线距离）'; // v2.11.7: every spot shows its distance (伏那秘境 grade is '' so its meta is just the distance; v2.11.9: same for 明仕那里酒店 — a hotel, not a graded scenic area)
   showDetail(s.name, meta, s.intro+'\n位置：'+s.loc, null, nearbyNavUrl(s.name));
 }
 function nearbyRender(){
@@ -1843,8 +1869,8 @@ document.getElementById('titleNearbyBtn').addEventListener('click',()=>{ // v2.1
   if(sh.hidden) openNearby(); else closeNearbyPanel();
 });
 /* chat reply for the 附近推荐景点 topic: all 4 spots, FIXED order
-   (v2.11.5: 峒那屿湾, 伏那秘境, 德天瀑布, 名仕田园 — never re-sorted
-   by GPS), each with an intro button (opens the popup) and a nav button
+   (v2.11.9: 明仕那里酒店, 峒那屿湾, 伏那秘境, 德天瀑布 —
+   never re-sorted by GPS), each with an intro button (opens the popup) and a nav button
    (Amap). Distances are from the Jianlongshan centre, straight-line. */
 function nearbyChatHtml(){
   const items=nearbySorted();

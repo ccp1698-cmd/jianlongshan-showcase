@@ -60,6 +60,8 @@ try {
   const imageryLayer = new Cesium.ImageryLayer(new Cesium.UrlTemplateImageryProvider({
     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
     maximumLevel: 18,
+    // 影像只拉 50km 范围矩形（覆盖地形外层框 + 余量），别全 globe 拉瓦片
+    rectangle: Cesium.Rectangle.fromDegrees(106.50, 22.65, 107.58, 23.65),
     credit: 'Esri, Maxar, Earthstar Geographics',
   }));
   const viewer = new Cesium.Viewer('cesiumContainer', {
@@ -70,7 +72,46 @@ try {
     vrButton: false, infoBox: false, selectionIndicator: false,
     requestRenderMode: true, maximumRenderTimeChange: Infinity,
   });
-  viewer.resolutionScale = Math.min(window.devicePixelRatio || 1, 1.5);
+  // ---- 流畅度（拖动卡）：手机降分辨率 + 拖动时降地形细节 + 关雾 ----
+  // 窄屏（手机）DPR 上限 1.0（原来 1.5），渲染像素数降约 55%，是拖动卡顿的最大头；
+  // 宽屏仍 1.5。本地 SwiftShader 帧率不代表手机，只看瓦片数/分辨率等可量化指标。
+  const dprCap = window.innerWidth <= 760 ? 1.0 : 1.5;
+  viewer.resolutionScale = Math.min(window.devicePixelRatio || 1, dprCap);
+  viewer.scene.fog.enabled = false; // 雾是每帧后处理，关掉省一笔；地形+影像本身已够真实
+  viewer.scene.skyAtmosphere.show = false; // 大气散射每帧算，关掉；天空用底色（见 index.html 背景）
+  viewer.scene.globe.maximumScreenSpaceError = 2;
+  // 拖动时放宽到 4：瓦片细节降一档，拖动中少拉/少解码瓦片；停稳恢复 2
+  viewer.camera.moveStart.addEventListener(() => {
+    viewer.scene.globe.maximumScreenSpaceError = 4;
+  });
+
+  // ---- 50km 范围限制：最大视野就是周边约 50km，不许缩到看整个地球 ----
+  const CENTER_LON = 107.0365, CENTER_LAT = 23.155;
+  const ctrl = viewer.scene.screenSpaceCameraController;
+  ctrl.maximumZoomDistance = 30000; // 相机到目标最远 30km（约 50km 范围的视野）
+  ctrl.minimumZoomDistance = 100;
+  // 兜底：moveEnd 时相机高度 >25km 或地面位置离中心 >45km 就拉回
+  const clampCamera = () => {
+    const cart = viewer.camera.positionCartographic;
+    if (!cart) return;
+    const h = cart.height;
+    const lon = Cesium.Math.toDegrees(cart.longitude), lat = Cesium.Math.toDegrees(cart.latitude);
+    const distM = Math.hypot((lon - CENTER_LON) * 102000, (lat - CENTER_LAT) * 111000);
+    if (h <= 25000 && distM <= 45000) return;
+    const nh = Math.min(h, 25000);
+    let nlon = lon, nlat = lat;
+    if (distM > 45000) {
+      const s = 45000 / distM;
+      nlon = CENTER_LON + (lon - CENTER_LON) * s;
+      nlat = CENTER_LAT + (lat - CENTER_LAT) * s;
+    }
+    viewer.camera.setView({
+      destination: Cesium.Cartesian3.fromDegrees(nlon, nlat, nh),
+      orientation: { heading: viewer.camera.heading, pitch: viewer.camera.pitch, roll: 0 },
+    });
+    viewer.scene.requestRender();
+  };
+  viewer.camera.moveEnd.addEventListener(clampCamera);
   viewer.scene.globe.depthTestAgainstTerrain = true;
   window.__viewer = viewer;
   window.__DATA__ = DATA;
@@ -241,8 +282,15 @@ try {
     labelsEnabled, mainPeak: currentMainPeak ? currentMainPeak.name : null,
     height: viewer.camera.positionCartographic.height,
   });
-  viewer.camera.moveEnd.addEventListener(() => { declutterLabels(); setTimeout(declutterLabels, 300); });
-  window.addEventListener('resize', () => setTimeout(declutterLabels, 100));
+  viewer.camera.moveEnd.addEventListener(() => {
+    viewer.scene.globe.maximumScreenSpaceError = 2; // 停稳恢复全细节
+    declutterLabels(); setTimeout(declutterLabels, 300);
+  });
+  window.addEventListener('resize', () => {
+    setTimeout(declutterLabels, 100);
+    // 尺寸变化也会触发 moveStart（msse 升到 4）却不一定有 moveEnd——这里兜底恢复 2
+    setTimeout(() => { viewer.scene.globe.maximumScreenSpaceError = 2; }, 200);
+  });
 
   // ---------- 视角预设 ----------
   const D2R = Cesium.Math.toRadians;
@@ -301,6 +349,12 @@ try {
     entities: viewer.entities.values.length,
     requestRenderMode: viewer.scene.requestRenderMode,
     resolutionScale: viewer.resolutionScale,
+    dprCap,
+    maxScreenSpaceError: viewer.scene.globe.maximumScreenSpaceError,
+    fogEnabled: viewer.scene.fog.enabled,
+    skyAtmosphere: viewer.scene.skyAtmosphere.show,
+    maxZoomDistance: viewer.scene.screenSpaceCameraController.maximumZoomDistance,
+    imageryRectangle: [106.50, 22.65, 107.58, 23.65],
     peaks: DATA.peaks.map((p) => ({ short: p.short, kmlH: p.kmlH, gridH: p.gridH })),
   };
   setStatus('就绪：地形 + 影像 + 标注');

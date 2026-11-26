@@ -1,7 +1,7 @@
 {
   "tilejson": "2.1.0",
   "name": "剑龙山地形",
-  "description": "剑龙山真实 DEM（景区）+ Terrarium（周边），heightmap-1.0",
+  "description": "剑龙山真实 DEM（景区）+ Terrarium z13（核心框）/ z11（中层+外层，约 50km 半径），heightmap-1.0",
   "format": "heightmap-1.0",
   "version": "1.0.0",
   "scheme": "tms",
@@ -11,13 +11,13 @@
   "minzoom": 0,
   "maxzoom": 15,
   "bounds": [
-    106.995,
-    23.115,
-    107.075,
-    23.195
+    106.55,
+    22.7,
+    107.53,
+    23.6
   ],
   "minheight": 0,
-  "maxheight": 856,
+  "maxheight": 1247,
   "available": [
     [
       {
@@ -61,7 +61,7 @@
     ],
     [
       {
-        "startX": 51,
+        "startX": 50,
         "startY": 20,
         "endX": 51,
         "endY": 20
@@ -69,7 +69,7 @@
     ],
     [
       {
-        "startX": 102,
+        "startX": 101,
         "startY": 40,
         "endX": 102,
         "endY": 40
@@ -77,7 +77,7 @@
     ],
     [
       {
-        "startX": 204,
+        "startX": 203,
         "startY": 80,
         "endX": 204,
         "endY": 80
@@ -85,42 +85,42 @@
     ],
     [
       {
-        "startX": 408,
+        "startX": 407,
         "startY": 160,
         "endX": 408,
-        "endY": 160
+        "endY": 161
       }
     ],
     [
       {
-        "startX": 816,
+        "startX": 815,
         "startY": 321,
         "endX": 816,
-        "endY": 321
+        "endY": 322
       }
     ],
     [
       {
-        "startX": 1632,
-        "startY": 643,
+        "startX": 1631,
+        "startY": 642,
         "endX": 1633,
-        "endY": 643
+        "endY": 644
       }
     ],
     [
       {
-        "startX": 3265,
-        "startY": 1286,
-        "endX": 3266,
-        "endY": 1287
+        "startX": 3263,
+        "startY": 1285,
+        "endX": 3267,
+        "endY": 1289
       }
     ],
     [
       {
-        "startX": 6530,
-        "startY": 2573,
-        "endX": 6532,
-        "endY": 2575
+        "startX": 6527,
+        "startY": 2570,
+        "endX": 6535,
+        "endY": 2578
       }
     ],
     [

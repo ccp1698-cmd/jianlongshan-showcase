@@ -23,6 +23,12 @@
   #legend i{display:inline-block;width:18px;height:4px;border-radius:2px;vertical-align:middle;margin-right:6px}
   #status{position:fixed;right:12px;bottom:14px;color:#cfe0ef;background:rgba(10,20,35,.55);padding:6px 8px;border-radius:8px;font-size:11px;line-height:1.5;max-width:300px;z-index:5}
   .cesium-widget-credits{font-size:10px !important}
+  /* 只去掉 CESIUM ION logo（我们没用 ion 服务：无 token、地形是自有 DEM、影像是 Esri）。
+     Esri "Data attribution" 小字保留，挪到按钮栏上方，别挡按钮。 */
+  .cesium-credit-logoContainer{display:none !important}
+  /* widgets.css 里 .cesium-viewer .cesium-widget-credits 把 position 置 static，
+     bottom 会失效——必须同等选择器 + 显式 absolute 才能挪动 */
+  .cesium-viewer .cesium-widget-credits{position:absolute !important;bottom:64px !important;left:8px !important;font-size:9px !important;background:rgba(10,20,35,.45);border-radius:4px;padding:2px 5px}
   @media (max-width:640px){
     #title{max-width:250px;padding:8px 10px}#title h1{font-size:15px}
     #views button{font-size:12px;padding:6px 10px}

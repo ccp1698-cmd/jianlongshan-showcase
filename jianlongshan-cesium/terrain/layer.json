@@ -1,0 +1,151 @@
+{
+  "tilejson": "2.1.0",
+  "name": "剑龙山地形",
+  "description": "剑龙山真实 DEM（景区）+ Terrarium（周边），heightmap-1.0",
+  "format": "heightmap-1.0",
+  "version": "1.0.0",
+  "scheme": "tms",
+  "tiles": [
+    "{z}/{x}/{y}.terrain"
+  ],
+  "minzoom": 0,
+  "maxzoom": 15,
+  "bounds": [
+    106.995,
+    23.115,
+    107.075,
+    23.195
+  ],
+  "minheight": 0,
+  "maxheight": 856,
+  "available": [
+    [
+      {
+        "startX": 1,
+        "startY": 0,
+        "endX": 1,
+        "endY": 0
+      }
+    ],
+    [
+      {
+        "startX": 3,
+        "startY": 1,
+        "endX": 3,
+        "endY": 1
+      }
+    ],
+    [
+      {
+        "startX": 6,
+        "startY": 2,
+        "endX": 6,
+        "endY": 2
+      }
+    ],
+    [
+      {
+        "startX": 12,
+        "startY": 5,
+        "endX": 12,
+        "endY": 5
+      }
+    ],
+    [
+      {
+        "startX": 25,
+        "startY": 10,
+        "endX": 25,
+        "endY": 10
+      }
+    ],
+    [
+      {
+        "startX": 51,
+        "startY": 20,
+        "endX": 51,
+        "endY": 20
+      }
+    ],
+    [
+      {
+        "startX": 102,
+        "startY": 40,
+        "endX": 102,
+        "endY": 40
+      }
+    ],
+    [
+      {
+        "startX": 204,
+        "startY": 80,
+        "endX": 204,
+        "endY": 80
+      }
+    ],
+    [
+      {
+        "startX": 408,
+        "startY": 160,
+        "endX": 408,
+        "endY": 160
+      }
+    ],
+    [
+      {
+        "startX": 816,
+        "startY": 321,
+        "endX": 816,
+        "endY": 321
+      }
+    ],
+    [
+      {
+        "startX": 1632,
+        "startY": 643,
+        "endX": 1633,
+        "endY": 643
+      }
+    ],
+    [
+      {
+        "startX": 3265,
+        "startY": 1286,
+        "endX": 3266,
+        "endY": 1287
+      }
+    ],
+    [
+      {
+        "startX": 6530,
+        "startY": 2573,
+        "endX": 6532,
+        "endY": 2575
+      }
+    ],
+    [
+      {
+        "startX": 13061,
+        "startY": 5147,
+        "endX": 13065,
+        "endY": 5151
+      }
+    ],
+    [
+      {
+        "startX": 26122,
+        "startY": 10295,
+        "endX": 26130,
+        "endY": 10303
+      }
+    ],
+    [
+      {
+        "startX": 52245,
+        "startY": 20591,
+        "endX": 52260,
+        "endY": 20606
+      }
+    ]
+  ]
+}

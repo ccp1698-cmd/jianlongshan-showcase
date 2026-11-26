@@ -1,6 +1,13 @@
-// 剑龙山真实感版 v7：Cesium + 本地 heightmap 地形 + Esri 卫星影像。
+// 剑龙山真实感版 v8：Cesium + 本地 heightmap 地形 + Esri 卫星影像。
 // 地形是我们的真实 DEM（136×144），高度真实、无竖向夸张；
 // 四峰标签用 KML 高程（用户已定）；农田不画贴片——卫星图上本来就是真农田。
+// v8（2026-11-26）：高清测试版——只提窄屏清晰度：DPR 上限 1.0→2.0、影像 15→17 级、
+// 静止 msse 3→2。字糊的主因查过：主标签是 Cesium SDF（48px 母字形，与分辨率无关，
+// 清晰度只跟帧缓冲走）；补给站 pill canvas 本来就是 2 倍绘制（300×44→150×22，
+// 设施图标 40×40→20×20），不用再改。所以字与影像糊的根子是帧缓冲 1.0 + 15 级瓦片。
+// 桌面端不动；其余窄屏减负（tileCache 50、并发 3、视角记忆、20km）不动。
+// 注意：这是测试版——3x iPhone 上帧缓冲像素数是 v7 的 4 倍，iOS 微信杀进程白屏
+// 可能回来，手机实测为准。
 // v7（2026-11-26）：按 4.kml 重建（四峰/路线/途点/设施/停车场/补给站），
 // 功能与 UI 按 v2.11.7 同步：二级标注错开 ±10px + 引出线、二级按距离渐变透明、
 // 近景拖动放慢、四峰弹窗照片、附近推荐固定顺序、访客中心升一级；
@@ -94,7 +101,7 @@ try {
   const makeImageryProvider = (style) => new Cesium.UrlTemplateImageryProvider({
     url: style.url,
     tileWidth: style.tileSize, tileHeight: style.tileSize,
-    maximumLevel: isNarrow ? 15 : 18, // 窄屏少拉高倍瓦片，省显存和流量；宽屏仍 18（换底图后同样生效）
+    maximumLevel: isNarrow ? 17 : 18, // v8 高清：窄屏 15→17（影像糊的主因是 15 级瓦片被拉大；宽屏仍 18；换底图后同样生效）
     // 影像只拉 20km 范围矩形（覆盖地形外层框 + 余量），别全 globe 拉瓦片
     rectangle: Cesium.Rectangle.fromDegrees(106.78, 22.92, 107.29, 23.39),
     credit: 'Esri, Maxar, Earthstar Geographics',
@@ -109,16 +116,22 @@ try {
     requestRenderMode: true, maximumRenderTimeChange: Infinity,
   });
   // ---- 流畅度（拖动卡）：手机降分辨率 + 拖动时降地形细节 ----
-  // 窄屏（手机）DPR 上限 1.0（原来 1.5），渲染像素数降约 55%，是拖动卡顿的最大头；
-  // 宽屏仍 1.5。本地 SwiftShader 帧率不代表手机，只看瓦片数/分辨率等可量化指标。
-  const dprCap = isNarrow ? 1.0 : 1.5;
+  // v8 高清测试：窄屏 DPR 上限 1.0→2.0（v4 防刷新时从 1.5 压到 1.0）。
+  // 实测校正（Cesium 1.147 源码 + DSF=3 探针）：Viewer 默认
+  // useBrowserRecommendedResolution=true，所以帧缓冲像素比 = resolutionScale
+  // 本身（不是 devicePixelRatio×resolutionScale）。v7 窄屏像素比 1.0→画布只有
+  // 390×844、被浏览器放大 3 倍贴到 1170×2532 的屏上，这才是字和影像糊的根子；
+  // v8 像素比 2.0→画布 780×1688，像素数是 v7 的 4 倍，只再放大 1.5 倍。
+  // 显存与解码压力同步上去——刷新白屏可能回来，手机实测为准。宽屏仍 1.5。
+  // 本地 SwiftShader 帧率不代表手机，只看瓦片数/分辨率等可量化指标。
+  const dprCap = isNarrow ? 2.0 : 1.5;
   viewer.resolutionScale = Math.min(window.devicePixelRatio || 1, dprCap);
   // 雾已关（用户要求去掉）：Cesium 内置 scene.fog 关闭，季节不再调雾密度。
   // 大气散射仍关（每帧算，贵；预设视角俯角大，天空基本不出画）。
   viewer.scene.fog.enabled = false;
   viewer.scene.skyAtmosphere.show = false; // 大气散射每帧算，关掉；天空用底色（见 index.html 背景）
-  // 窄屏静止时 msse 3（宽屏仍 2）：少拉一档瓦片；拖动时仍 4
-  const REST_MSSE = isNarrow ? 3 : 2;
+  // v8 高清：窄屏静止 msse 3→2（与宽屏同值，地形更细；拖动时仍 4）
+  const REST_MSSE = 2;
   viewer.scene.globe.maximumScreenSpaceError = REST_MSSE;
   // 窄屏地形瓦片缓存 50（默认 100），省显存；宽屏不动
   if (isNarrow) viewer.scene.globe.tileCacheSize = 50;
@@ -1336,7 +1349,7 @@ try {
   // ---------- 动画：徒步者 / 旗 / 雨 / GPS 脉冲（15fps，便宜） ----------
   // 每 66ms 更新一次位置并请求一次渲染；静态时仍靠 requestRenderMode 省电，
   // 但地图是“活”的（有人走、旗在摆），所以持续以 15fps 渲染——手机上够用，
-  // 拖动时的 DPR 1.0 + msse 4 优化仍在。
+  // 拖动时 msse 4 优化仍在。
   let lastTick = Date.now();
   function tick() {
     const now = Date.now();

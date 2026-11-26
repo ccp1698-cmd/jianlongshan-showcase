@@ -1,7 +1,7 @@
 {
   "tilejson": "2.1.0",
   "name": "剑龙山地形",
-  "description": "剑龙山真实 DEM（景区）+ Terrarium z13（核心框）/ z11（中层+外层，约 50km 半径），heightmap-1.0",
+  "description": "剑龙山真实 DEM（景区）+ Terrarium z13（核心框）/ z11（中层+外层，约 20km 半径），heightmap-1.0",
   "format": "heightmap-1.0",
   "version": "1.0.0",
   "scheme": "tms",
@@ -11,13 +11,13 @@
   "minzoom": 0,
   "maxzoom": 15,
   "bounds": [
-    106.55,
-    22.7,
-    107.53,
-    23.6
+    106.83,
+    22.97,
+    107.24,
+    23.34
   ],
   "minheight": 0,
-  "maxheight": 1247,
+  "maxheight": 1038,
   "available": [
     [
       {

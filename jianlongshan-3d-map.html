@@ -15,6 +15,12 @@ a{color:#9fc6a8;text-underline-offset:2px}
 /* map fills the whole screen — it is the core */
 #scene{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;background-image:radial-gradient(#cbd0bc .6px,transparent .9px);background-size:18px 18px}
 #markers{position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:3}
+/* v2.11.6: L2 leader lines — one SVG overlay inside #markers, under the
+   lv2 pills (z-index 20) and above the terrain; thin, faint, round
+   caps; fades with its pill (same .18s transition). pointer-events
+   none, so a line never blocks a tap or a drag. */
+#leaderLines{position:absolute;left:0;top:0;width:100%;height:100%;z-index:15;pointer-events:none}
+#leaderLines line{stroke:#4a5a50;stroke-opacity:.45;stroke-width:1;stroke-linecap:round;transition:opacity .18s ease-out}
 .marker{position:absolute;left:0;top:0;will-change:transform,opacity;pointer-events:auto;transition:opacity .18s ease-out;cursor:pointer;background:rgba(255,252,243,.94);border:1px solid #b9bfa9;color:var(--ink);border-radius:999px;padding:4px 10px;font-size:11px;font-weight:700;white-space:nowrap;box-shadow:0 2px 8px rgba(38,60,53,.18)}
 .marker.fac-ico{padding:2px 7px;font-size:12px;line-height:1.3} /* v2.10.14: L2/L3 font one step smaller (13->12); L1 untouched */
 .marker.wp.vert{writing-mode:vertical-rl;text-orientation:upright;font-size:7px;padding:1px;line-height:1.0;letter-spacing:0}
@@ -221,7 +227,7 @@ a{color:#9fc6a8;text-underline-offset:2px}
     <b>四季</b> —— 崇左属亚热带湿润季风区，年均 21–22℃，无霜期 330 天以上，年雨量约 1200 mm，雨季 4–9 月占全年近八成，春季多干旱：这里是“长夏无冬、四季常青”，所以不用温带春夏秋冬。<a href="https://www.weather.com.cn/cityintro/101300201.shtml" target="_blank" rel="noopener">中国天气网 · 崇左城市介绍 ↗</a><br>
   </div>
   <div class="foot">
-    地形：SRTM / Terrarium DEM · 山路：© OpenStreetMap contributors (ODbL) · 画风与结构：Pocket City Skill（April Zhu，MIT）· 树木放大 ×4 以便看清 · 山脊最高 730 m（天柱峰）· 微缩模型 v2.11.5 · <span>3D 模型：Polyfork（CC BY 4.0）</span> <button id="attrToggle" type="button">查看完整署名</button>
+    地形：SRTM / Terrarium DEM · 山路：© OpenStreetMap contributors (ODbL) · 画风与结构：Pocket City Skill（April Zhu，MIT）· 树木放大 ×4 以便看清 · 山脊最高 730 m（天柱峰）· 微缩模型 v2.11.6 · <span>3D 模型：Polyfork（CC BY 4.0）</span> <button id="attrToggle" type="button">查看完整署名</button>
     <div id="attrFull" hidden>3D 模型（CC BY 4.0）：Rammed-Earth Farmhouse by Polyfork (https://polyfork.dev/asset/rammed-earth-farmhouse-6432fc), CC BY 4.0；Gabled Farmhouse by Polyfork (https://polyfork.dev/asset/gabled-farmhouse-c7534f), CC BY 4.0；Thatched Cottage by Polyfork (https://polyfork.dev/asset/thatched-cottage-0e63f5), CC BY 4.0；Log Cabin by Polyfork (https://polyfork.dev/asset/log-cabin-4fac3b), CC BY 4.0；Timber Barn by Polyfork (https://polyfork.dev/asset/timber-barn-90b3ce), CC BY 4.0；Market Stall by Polyfork (https://polyfork.dev/asset/market-stall-9d0b29), CC BY 4.0；Town Car by Polyfork (https://polyfork.dev/asset/town-car-56eeb6), CC BY 4.0；Scout Jeep by Polyfork (https://polyfork.dev/asset/scout-jeep-c02efe), CC BY 4.0；Family Minivan by Polyfork (https://polyfork.dev/asset/family-minivan-924de0), CC BY 4.0；Horse by Polyfork (https://polyfork.dev/asset/horse-base), CC BY 4.0；Cow by Polyfork (https://polyfork.dev/asset/cow-base), CC BY 4.0；Sheep by Polyfork (https://polyfork.dev/asset/sheep-base), CC BY 4.0；Red Fox by Polyfork (https://polyfork.dev/asset/red-fox-5c3bc0), CC BY 4.0；Wooden Rowboat by Polyfork (https://polyfork.dev/asset/wooden-rowboat-916981), CC BY 4.0；Dock Platform Section by Polyfork (https://polyfork.dev/asset/dock-platform-section-b36e7c), CC BY 4.0；Trail Signpost by Polyfork (https://polyfork.dev/asset/trail-signpost-bd29a7), CC BY 4.0</div>
   </div>
 </div>
@@ -1287,6 +1293,18 @@ const parkedCarSpots=[];
 /* ---------- peaks: poles, flags, markers ---------- */
 const markers=[];
 const viewMarkers={};
+// v2.11.6: leader lines for the staggered L2 labels (user 2026-11-26
+// 15:26: "加引出线") — one SVG overlay inside #markers (z-index 15,
+// under the lv2 pills at 20, above the terrain), one <line> per L2
+// marker, from the pill's bottom-centre back to its own anchor. L1 has
+// no stagger and no line. A line follows its pill every frame
+// (updateMarkers) and fades with it (same opacity target as the pill,
+// plus a faint stroke — see the #leaderLines CSS). This is an L2-only
+// relaxation of the v2.10.3 rule (no vertical stagger, no leader lines)
+// — v2.11.2 relaxed the stagger, v2.11.6 relaxes the leader lines.
+const _leaderSvg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+_leaderSvg.setAttribute('id','leaderLines');
+document.getElementById('markers').appendChild(_leaderSvg);
 // v2.11.2: L2 stagger counter — the 18 L2 markers (12 waypoints, then
 // 3 parking, then 3 facilities, in creation order) alternate -10 / +10
 // px vertically, so neighbouring L2 pills separate instead of stacking.
@@ -1328,6 +1346,12 @@ function addMarker(lon,lat,yOff,html,cls,onClick,off){
   // top (pole top, +3.4 units since v2.9.7 doubled the flags; was +1.7), so the
   // label sits a fixed gap above its own red flag at every zoom/elevation.
   // lift is then only a fallback (unused when top is set).
+  // v2.11.6: leader line for L2 only — created here, endpoints and
+  // opacity are written every frame in updateMarkers; L1 gets no line
+  // (null). The initial opacity matches the pill's (hidden tier -> 0,
+  // otherwise the distance factor).
+  const _line=cls.indexOf('lv2')>=0?document.createElementNS('http://www.w3.org/2000/svg','line'):null;
+  if(_line){_line.style.opacity=_hidTier?'0':String(distOpacity());_leaderSvg.appendChild(_line);}
   markers.push({el,pos:new THREE.Vector3(x,y,z),lift:yOff,dx:(off&&off.dx)||0,dy:(off&&off.dy)||0,top:(off&&off.top)||null,
     // v2.10.9: tier classes hoisted at creation — updateMarkers used to call
     // classList.contains 3x per marker per frame (84 DOM calls/frame);
@@ -1343,7 +1367,11 @@ function addMarker(lon,lat,yOff,html,cls,onClick,off){
     // trail order, then parking, then facilities — neighbours on the
     // trail are neighbours on screen, so they split apart); L1 is 0.
     isL2:cls.indexOf('lv2')>=0,_vis:!_hidTier,
-    _stag:cls.indexOf('lv2')>=0?(_l2StagN++%2===0?-10:10):0});
+    _stag:cls.indexOf('lv2')>=0?(_l2StagN++%2===0?-10:10):0,
+    // v2.11.6: the marker's leader line (L2 only, null for L1); the
+    // endpoints are recorded on _lx1/_ly1 (pill end) and _lx2/_ly2
+    // (anchor end) every frame in updateMarkers, for the tests.
+    _line:_line});
   return el;
 }
 const flags=[]; // v2.9.9: waving summit flags {mesh, base positions, phase}
@@ -2066,6 +2094,10 @@ function fadeMarker(m,show){
   m._vis=show;
   if(show){m.el.style.opacity=m.isL2?String(distOpacity()):'1';m.el.style.pointerEvents='auto';}
   else{m.el.style.opacity='0';m.el.style.pointerEvents='none';}
+  // v2.11.6: the leader line fades with its pill (same target — the
+  // distance factor when visible, 0 when hidden). L1 has no line, so
+  // this only ever fires for L2.
+  if(m._line)m._line.style.opacity=show?String(distOpacity()):'0';
 }
 // v2.10.6: terrain-occlusion state, refreshed throttled (see
 // updateMarkers): at most every 100 ms while the camera moves, and once
@@ -2162,6 +2194,10 @@ function updateMarkers(){
     // distance factor. A hidden marker (m._vis false) keeps opacity 0
     // and is never written.
     if(m._vis)m.el.style.opacity=m.isL2?String(distOpacity()):'1';
+    // v2.11.6: the leader line retargets with its pill every frame
+    // (same distance factor); a hidden marker (m._vis false) keeps
+    // opacity 0 and is never written.
+    if(m._line&&m._vis)m._line.style.opacity=String(distOpacity());
     // v2.9.4: peak labels anchor to the FLAG TOP (m.top), not the summit — the
     // label's bottom edge sits a fixed 13 px above the projected flag top, so it
     // stays glued above its own red flag at every zoom and elevation. (The old
@@ -2192,7 +2228,11 @@ function updateMarkers(){
     // The ANCHOR never moves (the PIN probes measure anchor + _stag);
     // L1 keeps _stag 0, i.e. still pinned directly above its point.
     const lx0=(v3.x*0.5+0.5)*w+(m.dx||0)*s;
-    const ly=(-v3.y*0.5+0.5)*h+(m.dy||0)*s-liftPx+(m._stag||0);
+    // v2.11.6: ay is the anchor's screen y — the pill's bottom edge
+    // sits at ay - liftPx + _stag, and the leader line runs from the
+    // pill's bottom-centre (lx, ly) back to the anchor (lx0, ay).
+    const ay=(-v3.y*0.5+0.5)*h+(m.dy||0)*s;
+    const ly=ay-liftPx+(m._stag||0);
     // v2.10.14: NO pole nudge, NO shift of any kind — the v2.10.10 pole
     // clearance is deleted (see above): the pill centre is the anchor
     // (lx0), directly above its point. 脊生扶桑 sits 7 m from the 初脊峰
@@ -2222,6 +2262,14 @@ function updateMarkers(){
     }
     m._edgeClamp=_edgeClamp;
     m.el.style.transform='translate3d('+lx.toFixed(1)+'px,'+ly.toFixed(1)+'px,0) translate(-50%,-100%)';
+    // v2.11.6: leader line endpoints — pill bottom-centre (lx, ly) to
+    // its own anchor (lx0, ay). For _stag=+10 the pill already sits on
+    // its anchor, so the line is ~0 px (present but invisible); for
+    // _stag=-10 it spans the ~20 px gap. Written every frame, so the
+    // line tracks the pill through drag, pan and pinch. The flat fields
+    // are recorded for the tests (the SVG setAttribute is the real
+    // render path; the vm sandbox stubs it as a no-op).
+    if(m._line){m._line.setAttribute('x1',lx.toFixed(1));m._line.setAttribute('y1',ly.toFixed(1));m._line.setAttribute('x2',lx0.toFixed(1));m._line.setAttribute('y2',ay.toFixed(1));m._lx1=lx;m._ly1=ly;m._lx2=lx0;m._ly2=ay;}
   });
 }
 

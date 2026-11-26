@@ -1,4 +1,4 @@
-// 剑龙山真实感版 v10：Cesium + 本地 heightmap 地形 + Esri 卫星影像。
+// 剑龙山真实感版 v10.1：Cesium + 本地 heightmap 地形 + Esri 卫星影像。
 // v9（2026-11-26）：界面换肤——按 Three.js v2.11.8 参考图：白底 pill 标注（红字标高）、
 // 浅蓝虚线路线、顶栏 logo + 附近 pill + 刷新/首页、底部 6 按钮 dock、聊天 FAB 深色圆；
 // 地形/影像/数据一字不动；v8 高清三项（DPR 2.0、影像 17 级、msse 2）保留。

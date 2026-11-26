@@ -4,7 +4,7 @@
 <link rel="icon" href="data:,">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>剑龙山 · 3D 地图（Cesium 真实感版 v10）</title>
+<title>剑龙山 · 3D 地图（Cesium 真实感版 v10.1）</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cesium@1.147.0/Build/Cesium/Widgets/widgets.css">
 <style>
   html,body{margin:0;height:100%;overflow:hidden;background:#0b1220;font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif}
@@ -102,13 +102,14 @@
   .chatinput input{flex:1;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#fff;border-radius:16px;padding:8px 12px;font-size:13px;outline:none}
   .chatinput input::placeholder{color:#9fb4c8}
   .chatinput button{background:#07c160;border:0;color:#fff;border-radius:16px;padding:8px 14px;font-size:13px;cursor:pointer}
-  .cesium-widget-credits{font-size:10px !important}
+  .cesium-widget-credits{font-size:8px !important}
   /* 只去掉 CESIUM ION logo（我们没用 ion 服务：无 token、地形是自有 DEM、影像是 Esri）。
-     Esri "Data attribution" 小字保留，挪到按钮栏上方，别挡按钮。 */
+     Esri "Data attribution" 小字必须保留（免费卫星图的署名条件），v10.1 缩到最小最淡：
+     8px、半透明、浅底，仍在左下角按钮栏上方，可点开看完整署名。 */
   .cesium-credit-logoContainer{display:none !important}
   /* widgets.css 里 .cesium-viewer .cesium-widget-credits 把 position 置 static，
      bottom 会失效——必须同等选择器 + 显式 absolute 才能挪动 */
-  .cesium-viewer .cesium-widget-credits{position:absolute !important;bottom:64px !important;left:8px !important;font-size:9px !important;background:rgba(10,20,35,.45);border-radius:4px;padding:2px 5px}
+  .cesium-viewer .cesium-widget-credits{position:absolute !important;bottom:64px !important;left:8px !important;font-size:8px !important;background:rgba(10,20,35,.22);border-radius:4px;padding:1px 4px;opacity:.55}
   @media (max-width:1100px){
     #status{display:none}
   }
@@ -182,7 +183,7 @@
     <div>医疗点（入口 / 归元峰）· 卫生间（入口旁）</div>
     <div><span class="dot" style="background:#5f9e7f"></span>徒步者（40 名，沿环线行走）</div>
   </div>
-  <div class="verline">Cesium 真实感版 v10 · 20km 全功能</div>
+  <div class="verline">Cesium 真实感版 v10.1 · 20km 全功能</div>
 </div>
 <div class="sheet" id="sheet-notes" hidden>
   <h2>实地笔记 <button class="x" data-close aria-label="关闭">✕</button></h2>
@@ -191,7 +192,7 @@
     <b>山路</b> —— 只画景区官方路线（4.kml）：登山自水库北岸登山入口上归元峰，约 1036 米；下山自归元峰下至东侧应急出口，约 889 米；应急通道（下山中间的路）自应急出口连回登山入口，约 308 米；三段在归元峰、应急出口、访客集散广场三处交汇，严格闭合成环，全长约 2.2 公里，不走回头路。<br>
     <b>四季</b> —— 崇左属亚热带湿润季风区，年均 21–22℃，无霜期 330 天以上，年雨量约 1200 mm，雨季 4–9 月占全年近八成，春季多干旱：这里是“长夏无冬、四季常青”，所以不用温带春夏秋冬。<a href="https://www.weather.com.cn/cityintro/101300201.shtml" target="_blank" rel="noopener">中国天气网 · 崇左城市介绍 ↗</a><br>
   </div>
-  <div class="foot">地形：SRTM / Terrarium DEM · 影像：Esri World Imagery · 路线：景区提供（4.kml）· 地图引擎：Cesium（Apache 2.0）· Cesium 真实感版 v10</div>
+  <div class="foot">地形：SRTM / Terrarium DEM · 影像：Esri World Imagery · 路线：景区提供（4.kml）· 地图引擎：Cesium（Apache 2.0）· Cesium 真实感版 v10.1</div>
 </div>
 <div class="sheet" id="sheet-info" hidden>
   <h2>景区介绍 <button class="x" data-close aria-label="关闭">✕</button></h2>

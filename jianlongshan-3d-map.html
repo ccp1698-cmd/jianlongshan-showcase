@@ -222,7 +222,7 @@ a{color:#9fc6a8;text-underline-offset:2px}
     <b>四季</b> —— 崇左属亚热带湿润季风区，年均 21–22℃，无霜期 330 天以上，年雨量约 1200 mm，雨季 4–9 月占全年近八成，春季多干旱：这里是“长夏无冬、四季常青”，所以不用温带春夏秋冬。<a href="https://www.weather.com.cn/cityintro/101300201.shtml" target="_blank" rel="noopener">中国天气网 · 崇左城市介绍 ↗</a><br>
   </div>
   <div class="foot">
-    地形：SRTM / Terrarium DEM · 山路：© OpenStreetMap contributors (ODbL) · 画风与结构：Pocket City Skill（April Zhu，MIT）· 树木放大 ×4 以便看清 · 山脊最高 730 m（天柱峰）· 微缩模型 v2.10.13 · <span>3D 模型：Polyfork（CC BY 4.0）</span> <button id="attrToggle" type="button">查看完整署名</button>
+    地形：SRTM / Terrarium DEM · 山路：© OpenStreetMap contributors (ODbL) · 画风与结构：Pocket City Skill（April Zhu，MIT）· 树木放大 ×4 以便看清 · 山脊最高 730 m（天柱峰）· 微缩模型 v2.10.12 · <span>3D 模型：Polyfork（CC BY 4.0）</span> <button id="attrToggle" type="button">查看完整署名</button>
     <div id="attrFull" hidden>3D 模型（CC BY 4.0）：Rammed-Earth Farmhouse by Polyfork (https://polyfork.dev/asset/rammed-earth-farmhouse-6432fc), CC BY 4.0；Gabled Farmhouse by Polyfork (https://polyfork.dev/asset/gabled-farmhouse-c7534f), CC BY 4.0；Thatched Cottage by Polyfork (https://polyfork.dev/asset/thatched-cottage-0e63f5), CC BY 4.0；Log Cabin by Polyfork (https://polyfork.dev/asset/log-cabin-4fac3b), CC BY 4.0；Timber Barn by Polyfork (https://polyfork.dev/asset/timber-barn-90b3ce), CC BY 4.0；Market Stall by Polyfork (https://polyfork.dev/asset/market-stall-9d0b29), CC BY 4.0；Town Car by Polyfork (https://polyfork.dev/asset/town-car-56eeb6), CC BY 4.0；Scout Jeep by Polyfork (https://polyfork.dev/asset/scout-jeep-c02efe), CC BY 4.0；Family Minivan by Polyfork (https://polyfork.dev/asset/family-minivan-924de0), CC BY 4.0；Horse by Polyfork (https://polyfork.dev/asset/horse-base), CC BY 4.0；Cow by Polyfork (https://polyfork.dev/asset/cow-base), CC BY 4.0；Sheep by Polyfork (https://polyfork.dev/asset/sheep-base), CC BY 4.0；Red Fox by Polyfork (https://polyfork.dev/asset/red-fox-5c3bc0), CC BY 4.0；Wooden Rowboat by Polyfork (https://polyfork.dev/asset/wooden-rowboat-916981), CC BY 4.0；Dock Platform Section by Polyfork (https://polyfork.dev/asset/dock-platform-section-b36e7c), CC BY 4.0；Trail Signpost by Polyfork (https://polyfork.dev/asset/trail-signpost-bd29a7), CC BY 4.0</div>
   </div>
 </div>
@@ -1377,14 +1377,7 @@ const MED_ICO='<svg width="12" height="12" viewBox="0 0 12 12" style="vertical-a
 // points again (yOff 1.4, dx/dy 0); the v2.9.9 WP_STAG table is deleted.
 (DATA.waypoints||[]).forEach(w=>{
   const facHtml=(w.fac||[]).map(f=>f==='med'?MED_ICO:'🚻').join('');
-  // v2.10.13: 访客中心 is L1 (always visible, user 2026-11-26: "访客中心调成一级").
-  // It stays in DATA.waypoints (coordinates/text/photo untouched) — only the
-  // marker class changes to 'lv1', so isWp/isFac/isPark are all false, the
-  // tier check never hides it, and the declutter treats it as priority 1
-  // (never hidden). NOTE: the user called it L3 (facilities); in the engine
-  // it was L2 ('wp lv2', hidden past size 34) — either way it is now L1.
-  // The other 12 waypoints keep 'wp lv2'. L1 is now 10 (was 9).
-  const cls=w.label==='访客中心'?'lv1':'wp lv2'+(w.vert?' vert':'');
+  const cls='wp lv2'+(w.vert?' vert':'');
   addMarker(w.lon,w.lat,1.4,w.label+(facHtml?' '+facHtml:''),cls,()=>{
     showDetail(w.label,'',w.text,w.photo); flyTo(w.lon,w.lat,11);
   },{dx:w.dx||0,dy:w.dy||0});
@@ -1556,7 +1549,7 @@ const VIEWS={
   all:{lon:107.0365,lat:23.1550,size:35,az:1.45,el:0.40,label:'全景'},  // v2.10.7: panorama re-tuned to ref-panorama-v3.jpg (RMS 3.6; portrait params; landscape uses PANO_LAND via panoView())
   bird:{lon:107.0365,lat:23.1550,size:38,az:0,el:1.45,label:'鸟瞰'},  // v2.10.9: top-down overview, north-up; the views panel lists it automatically (Object.entries(VIEWS))
   chuji:{lon:107.037714,lat:23.157713,size:11,az:-1.54,el:0.62,label:'1号峰 初脊峰'},  // v2.10.10: view buttons numbered 1/2/3/5 (user 2026-11-25) — button text only, map labels untouched
-  jianban:{lon:107.03651,lat:23.155549,size:11,az:-1.9,el:0.3,label:'2号峰 剑板峰'},  // v2.10.13: refit to ref-jianban-view.jpg (anchor RMS 1.7; was lon 107.03691, lat 23.155449, az -0.89, el 0.62)
+  jianban:{lon:107.03691,lat:23.155449,size:11,az:-0.89,el:0.62,label:'2号峰 剑板峰'},
   tianzhu:{lon:107.035693,lat:23.154911,size:11,az:-2.5,el:0.8,label:'3号峰 天柱峰 ★'},  // v2.10.10: refit to the user's NEW screenshot work/ref-tianzhu-view-v2.jpg (RMS 2.0, 8 labels; centre moved +0.0002 lat from the peak — the peak label lands at 57.8,25.2 only with this offset; was v2.10.9 {107.035693,23.154711,size:20,az:-1.9,el:0.15} from the 20:28 screenshot, RMS 3.2). Note: 势崖道 does not exist — the waypoint is 劈崖道; the v2 fit first mis-keyed it and the RMS was inflated by the 60^2 MISS until corrected.
   guiyuan:{lon:107.035944,lat:23.153216,size:15,az:-2.2,el:0.45,label:'5号峰 归元峰'},  // v2.10.10: refit to the user's screenshot work/ref-guiyuan-view.jpg (RMS 1.6, 7 labels; centre moved -0.0001 lon/+0.0001 lat from the peak; was {107.036044,23.153116,size:11,az:2.09,el:0.62}). 伏山·补给站 is occluded from the south side (az -2.5..-3.0) and only appears from az ~ -2.2; the west camera (az -1.57) throws 天柱峰 off-screen.
   entrance:{lon:107.041,lat:23.1583,size:15,az:2.3,el:0.8,label:'入口'},  // v2.10.10: refit to work/ref-entrance-view.jpg (portrait params; landscape uses ENTRANCE_LAND via entranceView())
@@ -1913,20 +1906,8 @@ let dragging=false; // v2.10.9: single-finger drag active — tick() damps az/el
     if(pts.size===1&&dragBase){
       const tdx=e.clientX-dragBase.x, tdy=e.clientY-dragBase.y;
       if(Math.hypot(tdx,tdy)>2){
-        // v2.10.13: drag rates scale with the current size — the Pocket City
-        // rates (0.36/0.22 deg/px) are the size-35 panorama rates; with a
-        // fixed rate the same finger move whips the view 3.5x faster on
-        // screen at size 10 than at size 35 (diag C2: a 100 px drag turns
-        // dAz -0.628 rad at sizes 10/15/35 alike, moving a peak anchor
-        // 158.8/101.7/43.6 px — ratios 3.64/2.33). Scaling by size/35 keeps
-        // the on-screen speed the same at every zoom (panorama unchanged,
-        // k=1); the two-finger pan is already 1:1 at every size
-        // (panByScreenFlat: 100.0 px per 100 px finger at sizes 10/15/35)
-        // and is untouched. Damping (lambda 19/6.5) and the 2 px dead
-        // zone are unchanged.
-        const _dk=camGoal.size/35;
-        camGoal.az=dragBase.az-tdx*0.00628*_dk;  // right drag -> yaw decreases (same direction as the original)
-        camGoal.el=Math.min(1.29,Math.max(0.21,dragBase.el+tdy*0.00384*_dk));  // down drag -> el up (toward top-down)
+        camGoal.az=dragBase.az-tdx*0.00628;  // right drag -> yaw decreases (same direction as the original)
+        camGoal.el=Math.min(1.29,Math.max(0.21,dragBase.el+tdy*0.00384));  // down drag -> el up (toward top-down)
       }
     }
   });
@@ -2004,74 +1985,6 @@ function refreshOcclusion(){
   const c=cam.position;
   for(const m of markers){const a=m.top||m.pos;m.occ=isOccluded(a.x,a.y,a.z);}
 }
-// v2.10.13 declutterLabels — second layer after the L2 anchoring fix.
-// Every pill is first placed exactly on its anchor (like L1/L3); only
-// when two VISIBLE pills actually overlap is the lower-priority one moved,
-// horizontally, by the minimum to clear. Priority: L1 (peaks, lake,
-// entrance, exits, plaza) > L2 waypoints > L3 facilities/parking. The four
-// peak pills are never hidden; an L2/L3 pill that would need more than
-// 60 px of shift is hidden instead (it reappears when the view changes).
-// The shift direction comes from the ANCHOR side (fixed at the first hit),
-// so it is stable while panning — anchors keep their left/right order
-// under a pure pan. The final centre is clamped on-screen (same bounds as
-// the v2.10.11 peak clamp). The shift is recorded on m._declutterX (0 when
-// none) and a hidden pill on m._dcHidden, for the tests. _dcHidden /
-// _declutterX are rewritten for every pill that reaches the declutter each
-// frame; a pill that returns early (tier/occlusion) is invisible
-// (opacity 0) and the tests skip it, so a stale flag there is harmless.
-function declutterLabels(list,w){
-  const _prio=function(it){return it.m.isWp?2:((it.m.isPark||it.m.isFac)?3:1);};
-  list.sort(function(a,b){return _prio(a)-_prio(b);});
-  const _placed=[];
-  for(const it of list){
-    const p=_prio(it), ax0=it.lx;
-    let x=ax0, shift=0, hide=false, dir=0;
-    // v2.10.13b: 10 rounds — a higher cap backfires for L2: the loop
-    // keeps shifting until the cumulative 60 px cap hides the pill,
-    // while 10 rounds give up and leave it visible (a small overlap
-    // beats hiding a waypoint the user wants to see). The post-clamp
-    // re-check below hides only substantial overlaps.
-    for(let g=0;g<10;g++){
-      let hit=null;
-      for(const q of _placed){
-        if(x-it.w/2<q.x+q.w/2&&x+it.w/2>q.x-q.w/2&&it.ly-it.h<q.ly&&it.ly>q.ly-q.h){hit=q;break;}
-      }
-      if(!hit)break;
-      if(dir===0)dir=(ax0>=hit.ax)?1:-1;
-      const d=dir>0?(hit.x+hit.w/2+2+it.w/2)-x:(hit.x-hit.w/2-2-it.w/2)-x;
-      if(p===1){x+=d;shift+=Math.abs(d);}
-      else if(shift+Math.abs(d)<=60){x+=d;shift+=Math.abs(d);}
-      else{hide=true;break;}
-    }
-    if(!hide){
-      x=Math.max(it.w/2,Math.min(w-it.w/2,x));
-      // v2.10.13b: the on-screen clamp can push a pill back into one it
-      // was shifted clear of (entrance cluster at the panorama, waypoint
-      // pile-ups at close zoom). Re-check after clamping: an L2/L3 pill
-      // that still SEVERELY overlaps is hidden instead of left
-      // overlapping (the declutter's rule — hide rather than overlap).
-      // A moderate edge touch (e.g. 刃脊道 vs 劈崖道 13x7 px at the
-      // 剑板峰 preset) is tolerated — hiding a waypoint the user wants
-      // to see is worse than a 13 px edge touch. Only an overlap over
-      // half a pill wide (25 px) and half a pill tall (10 px) hides.
-      // L1 is never hidden; a peak/entrance pill that cannot be
-      // separated horizontally is left as-is (anchors closer than a
-      // pill width at that state; the user forbids vertical stagger
-      // and hiding peaks).
-      let clash=false;
-      for(const q of _placed){
-        const ox=Math.min(x+it.w/2,q.x+q.w/2)-Math.max(x-it.w/2,q.x-q.w/2);
-        const oy=Math.min(it.ly,q.ly)-Math.max(it.ly-it.h,q.ly-q.h);
-        if(ox>25&&oy>10){clash=true;break;}
-      }
-      if(clash&&p>1){hide=true;}
-      else{it.lx=x;_placed.push({x:x,ly:it.ly,w:it.w,h:it.h,ax:ax0});}
-    }
-    it.m._declutterX=hide?0:+(x-ax0).toFixed(1);
-    it.m._dcHidden=hide;
-    if(hide){it.m.el.style.opacity='0';it.m.el.style.pointerEvents='none';}
-  }
-}
 function updateMarkers(){
   const w=canvas.clientWidth, h=canvas.clientHeight;
   const _cs=camState;
@@ -2103,17 +2016,23 @@ function updateMarkers(){
   // skip would then freeze in place. (Latent since v2.10.2: there the
   // next tick's update healed it, so it never showed.)
   cam.updateMatrixWorld();
-  // v2.10.13: the v2.10.10 flagpole-clearance segments are REMOVED with
-  // the pole nudge (see below) — they existed only to feed it.
+  // v2.10.10: flagpole clearance segments (screen space) — a waypoint
+  // whose pill would sit on a summit flagpole gets the minimum
+  // horizontal nudge to clear it (see below). A pole is the vertical
+  // segment from the summit ground point to the flag top (+3.4 units).
+  const _poles=[];
+  for(const pk of DATA.peaks){
+    const [pxx,pzz]=sceneOf(pk.lon,pk.lat); const py=yOf(demAt(pk.lon,pk.lat));
+    v3.set(pxx,py+3.4,pzz).project(cam);
+    const _pTopY=(-v3.y*0.5+0.5)*h;
+    v3.set(pxx,py,pzz).project(cam);
+    if(v3.z<=1)_poles.push({x:(v3.x*0.5+0.5)*w,yTop:Math.min(_pTopY,(-v3.y*0.5+0.5)*h),yBot:Math.max(_pTopY,(-v3.y*0.5+0.5)*h)});
+  }
   // v1.3.5: label offsets shrink when zoomed in, so a label sits on its point
   // instead of floating far away (s = 1 at the default zoom, 0.2 at max zoom).
   // The yOff lift is a fixed pixel amount (its size-40 screen height), not a
   // world-space offset that grows with zoom.
   const s=Math.min(1,Math.max(0.2,camState.size/40));
-  // v2.10.13: pills are collected first and their transforms written
-  // after the declutter pass (below), so the declutter sees every
-  // visible pill's rect before any of them is placed.
-  const _dcList=[];
   markers.forEach(m=>{
     // v2.7.1: split thresholds — see below. (The old thresholds (park>12,
     // fac>18) hid the new facilities/parking at every usable zoom.)
@@ -2124,12 +2043,11 @@ function updateMarkers(){
     // v2.10.9: L2 lowered 40 -> 34 (user: "二级降到 34–36" — only 34 keeps
     // the panorama clean: the panorama is size 35, so at 35/36 the
     // waypoints would still show there; at 34, 35>34 hides them).
-    // Level 2 (12 waypoints) hides past size 34: hidden at the panorama
+    // Level 2 (13 waypoints) hides past size 34: hidden at the panorama
     // default (35) and the entrance default (44/50); appears when zoomed
-    // in past 34. (访客中心 left L2 in v2.10.13 — it is L1 now, always
-    // visible.) Level 3 (parking, toilet, medical) hides past size 30:
+    // in past 34. Level 3 (parking, toilet, medical) hides past size 30:
     // hidden at the panorama (35), appears when zoomed in past 30.
-    // Three tiers: panorama shows 10, size 25 shows all 28.
+    // Three tiers: panorama shows 9, size 25 shows all 28.
     // (v2.9.9 thresholds were L2 >30, L3 >18; v2.10.8 raised both to
     // 40/30; v2.10.9 lowers L2 to 34, L3 stays 30.)
     // v2.10.6: tier visibility FADES (opacity, 180 ms) instead of popping
@@ -2147,19 +2065,7 @@ function updateMarkers(){
     // the fingers move; anchor error ≤0.05 px). A label that crosses a
     // tier threshold mid-pinch simply waits: it fades in/out the moment
     // the gesture ends, instead of flickering while zooming.
-    const _tierHid=(isPark&&camState.size>30)||(isWp&&camState.size>34)||(isFac&&camState.size>30);
-    // v2.10.13: L2 waypoints are never allowed a stale transform. In
-    // v2.10.12 the early return skipped the transform write for a marker
-    // that crossed a tier/occlusion threshold mid-pinch — its fade was
-    // frozen (v2.10.7) so it stayed VISIBLE at its old screen spot while
-    // the map panned under it (diag B2b: 8 waypoints frozen 4 steps each
-    // during a pinch-out past size 34, drifting 46-64 px off their
-    // points). L2 now falls through and gets its transform rewritten
-    // every frame; only its fade stays frozen during a pinch. L1/L3 keep
-    // the exact v2.10.12 early return (their positioning logic is
-    // untouched).
-    if(!isWp&&(_tierHid||m.occ)){if(!pinching)fadeMarker(m,false);return;}
-    if(isWp&&(_tierHid||m.occ)&&!pinching){fadeMarker(m,false);return;}
+    if((isPark&&camState.size>30)||(isWp&&camState.size>34)||(isFac&&camState.size>30)||m.occ){if(!pinching)fadeMarker(m,false);return;}
     // v2.9.4: peak labels anchor to the FLAG TOP (m.top), not the summit — the
     // label's bottom edge sits a fixed 13 px above the projected flag top, so it
     // stays glued above its own red flag at every zoom and elevation. (The old
@@ -2196,18 +2102,17 @@ function updateMarkers(){
     // pill actually overlaps a pole segment is it shifted horizontally
     // by the minimum to clear (pill half-width + 3 px), to the nearer
     // side. Recorded on m._poleNudge (0 when none) for the tests.
-    // v2.10.13: the v2.10.10 pole nudge is REMOVED. It was the only
-    // L2-only displacement: it pushed waypoint pills 11-37 px sideways
-    // off their anchors whenever a pill overlapped a summit pole segment
-    // (diag fit: 脊生扶桑 -27..-30, 拜山·补给站 -16..-37, 归云道 -18..+20;
-    // diag B1b: the nudge is constant during a pure pan, so the pill sits
-    // 11-27 px off its point the whole time), and it flipped side when a
-    // pill's anchor crossed a pole — the "二级没有固定好" the user sees.
-    // L2 pills now sit exactly on their anchors like L1/L3; pill-vs-pill
-    // overlap is the declutter's job (below). m._poleNudge stays 0 for
-    // the tests (they read it as (m._poleNudge||0)).
-    let lx=lx0;
-    m._poleNudge=0;
+    let lx=lx0, _nudge=0;
+    if(isWp){
+      if(m._hw===undefined){m._hw=m.el.offsetWidth/2;m._hh=m.el.offsetHeight;}
+      for(const pl of _poles){
+        if(Math.abs(lx-pl.x)<m._hw+3&&ly>pl.yTop-2&&ly-m._hh<pl.yBot+2){
+          _nudge=lx>=pl.x?(pl.x+m._hw+3-lx):(pl.x-m._hw-3-lx);
+          lx+=_nudge; break;
+        }
+      }
+    }
+    m._poleNudge=_nudge;
     // v2.10.11: keep peak pills on-screen — the numbered pills are
     // ~30 px wider, so when a peak anchor sits near the right edge the
     // pill ran past it (panorama: 初脊峰 cut to "1号峰 初脊峰 6";
@@ -2228,19 +2133,8 @@ function updateMarkers(){
       else if(lx>w-m._hw){_edgeClamp=w-m._hw-lx;lx=w-m._hw;}
     }
     m._edgeClamp=_edgeClamp;
-    // v2.10.13: measure once (cached) — the declutter needs every visible
-    // pill's size; peaks already measured it in the clamp above.
-    if(m._hw===undefined){m._hw=m.el.offsetWidth/2;m._hh=m.el.offsetHeight;}
-    _dcList.push({m:m,lx:lx,ly:ly,w:m._hw*2,h:m._hh});
+    m.el.style.transform='translate3d('+lx.toFixed(1)+'px,'+ly.toFixed(1)+'px,0) translate(-50%,-100%)';
   });
-  // v2.10.13 declutter (second layer, after the L2 anchoring fix) — every
-  // pill is first placed exactly on its anchor; only pills that actually
-  // overlap are moved, horizontally, by the minimum to clear (or hidden
-  // if L2/L3 and the shift would exceed 60 px). Peaks are never hidden.
-  declutterLabels(_dcList,w);
-  for(const _it of _dcList){
-    _it.m.el.style.transform='translate3d('+_it.lx.toFixed(1)+'px,'+_it.ly.toFixed(1)+'px,0) translate(-50%,-100%)';
-  }
 }
 
 /* ---------- animation loop ---------- */

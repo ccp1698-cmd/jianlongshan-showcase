@@ -16,17 +16,16 @@ a{color:#9fc6a8;text-underline-offset:2px}
 #scene{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;background-image:radial-gradient(#cbd0bc .6px,transparent .9px);background-size:18px 18px}
 #markers{position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:3}
 .marker{position:absolute;left:0;top:0;will-change:transform,opacity;pointer-events:auto;transition:opacity .18s ease-out;cursor:pointer;background:rgba(255,252,243,.94);border:1px solid #b9bfa9;color:var(--ink);border-radius:999px;padding:4px 10px;font-size:11px;font-weight:700;white-space:nowrap;box-shadow:0 2px 8px rgba(38,60,53,.18)}
-.marker.fac-ico{padding:2px 7px;font-size:13px;line-height:1.3}
+.marker.fac-ico{padding:2px 7px;font-size:12px;line-height:1.3} /* v2.10.14: L2/L3 font one step smaller (13->12); L1 untouched */
 .marker.wp.vert{writing-mode:vertical-rl;text-orientation:upright;font-size:7px;padding:1px;line-height:1.0;letter-spacing:0}
 .marker b{color:var(--rust)}
 .marker .star{color:#d4a017}
 .marker.peak{border-color:#8a9a7a}
-.marker.wp{font-size:10px;padding:2px 7px;color:#4a5a50}
-.marker.park{background:#dbe7f2;border-color:#7ba3c4;color:#2f4a66}
-/* 标识分级（v1.7.4）：一级（四峰/出入口/水库）永远在最上，二级（途点）次之，三级（补给/卫生间/医疗）最下，谁也盖不住一级；v2.7.1 起三级与停车场已加回（广场与出入口附近） */
+.marker.wp{font-size:9px;padding:2px 7px;color:#4a5a50} /* v2.10.14: L2 font one step smaller (10->9); L1 untouched */
+.marker.park{background:#dbe7f2;border-color:#7ba3c4;color:#2f4a66;font-size:9px} /* v2.10.14: parking is L2 now (was L3, 11px desktop / 10px phone) — same 9px as the other L2 labels */
+/* 标识分级（v1.7.4，v2.10.14 起只有两级）：一级（四峰/出入口/水库/访客中心）永远在最上，二级（途点/停车场/补给/卫生间/医疗）次之，谁也盖不住一级；三级已并入二级 */
 .marker.lv1{z-index:30}
 .marker.lv2{z-index:20}
-.marker.lv3{z-index:10}
 .marker.lake{border-color:#5f9aa8;color:#2f5a66}
 .marker:hover{background:#fff}
 .marker.flash{animation:markerFlash 1.2s ease-in-out 3}
@@ -222,7 +221,7 @@ a{color:#9fc6a8;text-underline-offset:2px}
     <b>四季</b> —— 崇左属亚热带湿润季风区，年均 21–22℃，无霜期 330 天以上，年雨量约 1200 mm，雨季 4–9 月占全年近八成，春季多干旱：这里是“长夏无冬、四季常青”，所以不用温带春夏秋冬。<a href="https://www.weather.com.cn/cityintro/101300201.shtml" target="_blank" rel="noopener">中国天气网 · 崇左城市介绍 ↗</a><br>
   </div>
   <div class="foot">
-    地形：SRTM / Terrarium DEM · 山路：© OpenStreetMap contributors (ODbL) · 画风与结构：Pocket City Skill（April Zhu，MIT）· 树木放大 ×4 以便看清 · 山脊最高 730 m（天柱峰）· 微缩模型 v2.10.12 · <span>3D 模型：Polyfork（CC BY 4.0）</span> <button id="attrToggle" type="button">查看完整署名</button>
+    地形：SRTM / Terrarium DEM · 山路：© OpenStreetMap contributors (ODbL) · 画风与结构：Pocket City Skill（April Zhu，MIT）· 树木放大 ×4 以便看清 · 山脊最高 730 m（天柱峰）· 微缩模型 v2.10.14 · <span>3D 模型：Polyfork（CC BY 4.0）</span> <button id="attrToggle" type="button">查看完整署名</button>
     <div id="attrFull" hidden>3D 模型（CC BY 4.0）：Rammed-Earth Farmhouse by Polyfork (https://polyfork.dev/asset/rammed-earth-farmhouse-6432fc), CC BY 4.0；Gabled Farmhouse by Polyfork (https://polyfork.dev/asset/gabled-farmhouse-c7534f), CC BY 4.0；Thatched Cottage by Polyfork (https://polyfork.dev/asset/thatched-cottage-0e63f5), CC BY 4.0；Log Cabin by Polyfork (https://polyfork.dev/asset/log-cabin-4fac3b), CC BY 4.0；Timber Barn by Polyfork (https://polyfork.dev/asset/timber-barn-90b3ce), CC BY 4.0；Market Stall by Polyfork (https://polyfork.dev/asset/market-stall-9d0b29), CC BY 4.0；Town Car by Polyfork (https://polyfork.dev/asset/town-car-56eeb6), CC BY 4.0；Scout Jeep by Polyfork (https://polyfork.dev/asset/scout-jeep-c02efe), CC BY 4.0；Family Minivan by Polyfork (https://polyfork.dev/asset/family-minivan-924de0), CC BY 4.0；Horse by Polyfork (https://polyfork.dev/asset/horse-base), CC BY 4.0；Cow by Polyfork (https://polyfork.dev/asset/cow-base), CC BY 4.0；Sheep by Polyfork (https://polyfork.dev/asset/sheep-base), CC BY 4.0；Red Fox by Polyfork (https://polyfork.dev/asset/red-fox-5c3bc0), CC BY 4.0；Wooden Rowboat by Polyfork (https://polyfork.dev/asset/wooden-rowboat-916981), CC BY 4.0；Dock Platform Section by Polyfork (https://polyfork.dev/asset/dock-platform-section-b36e7c), CC BY 4.0；Trail Signpost by Polyfork (https://polyfork.dev/asset/trail-signpost-bd29a7), CC BY 4.0</div>
   </div>
 </div>
@@ -1285,11 +1284,15 @@ function addMarker(lon,lat,yOff,html,cls,onClick,off){
   el.addEventListener('click',onClick);
   document.getElementById('markers').appendChild(el);
   // v2.10.6: initialise the tier fade state at build time — camState is
-  // at intro A (size 55), so L2/L3 start hidden; without this the 22
+  // at intro A (size 55), so L2 starts hidden; without this the 18
   // tier-hidden labels would paint once at opacity 1 and fade out over
   // 180 ms on load (the CSS transition animates from the pre-paint
   // value even though the first tick is synchronous).
-  const _hidTier=(cls.indexOf('park')>=0||cls.indexOf('fac')>=0)?camState.size>30:(cls.indexOf('wp')>=0?camState.size>34:false);
+  // v2.10.14: TWO TIERS ONLY — L3 merged into L2 (user: "把三级所有的
+  // 按钮全部归属到二级！只有一级和二级没有三级了"). Every non-L1 marker
+  // (waypoints, parking, facilities) hides past size 34 (L3 used to hide
+  // past 30); the panorama (size 35) still hides them all.
+  const _hidTier=cls.indexOf('lv2')>=0?camState.size>34:false;
   el.style.opacity=_hidTier?'0':'1'; el.style.pointerEvents=_hidTier?'none':'auto';
   // v2.10: vertical stagger CANCELLED (user: "取消垂直错开") — the v2.9.9
   // off.stag fixed-pixel offsets and the 1 px leader lines are gone; every
@@ -1310,7 +1313,9 @@ function addMarker(lon,lat,yOff,html,cls,onClick,off){
     // v2.10.9: tier classes hoisted at creation — updateMarkers used to call
     // classList.contains 3x per marker per frame (84 DOM calls/frame);
     // the classes never change after creation, so read them once here.
-    isPark:cls.indexOf('park')>=0,isWp:cls.indexOf('wp')>=0,isFac:cls.indexOf('fac')>=0});
+    // v2.10.14: one flag only — isL2 (class 'lv2'); L3 is gone (merged
+    // into L2), L1 is "not L2".
+    isL2:cls.indexOf('lv2')>=0});
   return el;
 }
 const flags=[]; // v2.9.9: waving summit flags {mesh, base positions, phase}
@@ -1375,14 +1380,20 @@ const MED_ICO='<svg width="12" height="12" viewBox="0 0 12 12" style="vertical-a
 // yOff 1.4 gives a ~10 px gap above each point; dx/dy are 0 (no fan-out).
 // v2.10: stagger cancelled (user) — waypoints anchor directly above their
 // points again (yOff 1.4, dx/dy 0); the v2.9.9 WP_STAG table is deleted.
+// v2.10.14: 访客中心 is Level 1 now (user 2026-11-26 10:50 "地图里的访客中心调成一级！
+// 固定好他的位置") — it was a waypoint ('wp lv2', hidden past size 34); the user called
+// it L3, but the engine had it as L2. Only its marker class changes to 'lv1' here; it
+// stays in DATA.waypoints, coordinates/text/photo untouched. L1 is now 10 (was 9),
+// L2 waypoints are 12 (was 13).
 (DATA.waypoints||[]).forEach(w=>{
   const facHtml=(w.fac||[]).map(f=>f==='med'?MED_ICO:'🚻').join('');
-  const cls='wp lv2'+(w.vert?' vert':'');
+  const cls=(w.label==='访客中心'?'lv1':'wp lv2')+(w.vert?' vert':'');
   addMarker(w.lon,w.lat,1.4,w.label+(facHtml?' '+facHtml:''),cls,()=>{
     showDetail(w.label,'',w.text,w.photo); flyTo(w.lon,w.lat,11);
   },{dx:w.dx||0,dy:w.dy||0});
 });
-// v2.9.8: 3 KML parking lots (Level 3, 'park' class, hidden when size>30 since v2.10.8).
+// v2.9.8: 3 KML parking lots (Level 2 since v2.10.14 — L3 merged into L2,
+// 'park' class, hidden when size>34; was Level 3, hidden past 30).
 // The alternating dy 44/-8 is removed: labels anchor directly above their
 // points. (The two lots ~35 m apart overlap at the default view and
 // separate when zoomed in.)
@@ -1393,15 +1404,16 @@ const MED_ICO='<svg width="12" height="12" viewBox="0 0 12 12" style="vertical-a
   },{});
 });
 /* 卫生间 / 医疗点 (v1.6.2, per official guide map) — icon only, no text */
-// v2.9.8: 2 medical points + 1 toilet per KML (Level 3, hidden when
-// size>30 since v2.10.8). Icon-only markers; the Hospital 3D model is NOT brought back.
+// v2.9.8: 2 medical points + 1 toilet per KML (Level 2 since v2.10.14 —
+// L3 merged into L2, hidden when size>34; was Level 3, hidden past 30).
+// Icon-only markers; the Hospital 3D model is NOT brought back.
 // v2.10: stagger cancelled (user) — facility icons anchor above their points.
 // v2.10.1: the 4 v2.10 facilities beside the supply stations are GONE
 // (user: the icons belong inside the supply-station label); the two supply
 // stations carry fac:['med','wc'] in DATA instead — see the waypoint block.
 (DATA.facilities||[]).forEach((f,i)=>{
   const html=f.kind==='med'?MED_ICO:'🚻';
-  addMarker(f.lon,f.lat,1.4,html,'fac fac-ico lv3',()=>{
+  addMarker(f.lon,f.lat,1.4,html,'fac fac-ico lv2',()=>{
     showDetail(f.label,'',f.text,f.photo); flyTo(f.lon,f.lat,11);
   },{dx:f.dx||0,dy:f.dy||0});
 });
@@ -2016,56 +2028,48 @@ function updateMarkers(){
   // skip would then freeze in place. (Latent since v2.10.2: there the
   // next tick's update healed it, so it never showed.)
   cam.updateMatrixWorld();
-  // v2.10.10: flagpole clearance segments (screen space) — a waypoint
-  // whose pill would sit on a summit flagpole gets the minimum
-  // horizontal nudge to clear it (see below). A pole is the vertical
-  // segment from the summit ground point to the flag top (+3.4 units).
-  const _poles=[];
-  for(const pk of DATA.peaks){
-    const [pxx,pzz]=sceneOf(pk.lon,pk.lat); const py=yOf(demAt(pk.lon,pk.lat));
-    v3.set(pxx,py+3.4,pzz).project(cam);
-    const _pTopY=(-v3.y*0.5+0.5)*h;
-    v3.set(pxx,py,pzz).project(cam);
-    if(v3.z<=1)_poles.push({x:(v3.x*0.5+0.5)*w,yTop:Math.min(_pTopY,(-v3.y*0.5+0.5)*h),yBot:Math.max(_pTopY,(-v3.y*0.5+0.5)*h)});
-  }
+  // v2.10.14: the v2.10.10 flagpole-clearance segments are GONE with the
+  // pole nudge below (user: "把所有地图上的按钮定死在点位上" — no shifts
+  // of any kind; a pill sits directly above its anchor, even if that puts
+  // 脊生扶桑 on the 初脊峰 pole at close range again — the user's explicit
+  // trade-off, no shift is applied any more).
   // v1.3.5: label offsets shrink when zoomed in, so a label sits on its point
   // instead of floating far away (s = 1 at the default zoom, 0.2 at max zoom).
   // The yOff lift is a fixed pixel amount (its size-40 screen height), not a
   // world-space offset that grows with zoom.
   const s=Math.min(1,Math.max(0.2,camState.size/40));
   markers.forEach(m=>{
-    // v2.7.1: split thresholds — see below. (The old thresholds (park>12,
-    // fac>18) hid the new facilities/parking at every usable zoom.)
-    // v2.10.9: hoisted tier flags (see addMarker) — no classList.contains
-    // in the per-frame loop any more; during a pinch the only style write
-    // below is transform (fadeMarker is frozen, see v2.10.7).
-    const isPark=m.isPark, isWp=m.isWp, isFac=m.isFac;
-    // v2.10.9: L2 lowered 40 -> 34 (user: "二级降到 34–36" — only 34 keeps
-    // the panorama clean: the panorama is size 35, so at 35/36 the
-    // waypoints would still show there; at 34, 35>34 hides them).
-    // Level 2 (13 waypoints) hides past size 34: hidden at the panorama
-    // default (35) and the entrance default (44/50); appears when zoomed
-    // in past 34. Level 3 (parking, toilet, medical) hides past size 30:
-    // hidden at the panorama (35), appears when zoomed in past 30.
-    // Three tiers: panorama shows 9, size 25 shows all 28.
-    // (v2.9.9 thresholds were L2 >30, L3 >18; v2.10.8 raised both to
-    // 40/30; v2.10.9 lowers L2 to 34, L3 stays 30.)
+    // v2.10.9: hoisted tier flag (see addMarker) — no classList.contains
+    // in the per-frame loop any more.
+    // v2.10.14: TWO TIERS ONLY — L3 merged into L2 (user: "把三级所有的按钮
+    // 全部归属到二级！只有一级和二级没有三级了").
+    // Level 2 (12 waypoints + 3 parking + 3 facilities) hides past size 34:
+    // hidden at the panorama default (35); appears when zoomed in past 34.
+    // (v2.9.9 thresholds were L2 >30, L3 >18; v2.10.8 raised both to 40/30;
+    // v2.10.9 lowered L2 to 34; v2.10.14 merges L3 into L2 at 34 — ex-L3
+    // markers newly appear at sizes 31-34, panorama at 35 is unaffected.)
+    // Two tiers: panorama shows 10, size 25 shows all 28.
     // v2.10.6: tier visibility FADES (opacity, 180 ms) instead of popping
     // via display:none — the pop was the visible "jump" mid-pinch-zoom
-    // (13 waypoints appear in one frame at size 34, 6 more at size 30).
+    // (12 waypoints + 6 facilities appear in one frame at size 34).
     // Opacity is compositor-cheap; pointer-events off while faded so an
-    // invisible label never intercepts a tap. The transform is still
-    // written every frame while the camera moves, so a label fades in
-    // exactly on its anchor (anchor tolerance unchanged, ≤0.05 px).
+    // invisible label never intercepts a tap.
     // v2.10.6: + terrain occlusion (m.occ, refreshed above) — a label
     // whose anchor is behind a hill from this camera fades out with it.
-    // v2.10.7: tier/occlusion visibility is FROZEN during a pinch —
-    // the fade calls are skipped (the transform is still written below
-    // for visible labels, so a label stays glued to its anchor while
-    // the fingers move; anchor error ≤0.05 px). A label that crosses a
-    // tier threshold mid-pinch simply waits: it fades in/out the moment
-    // the gesture ends, instead of flickering while zooming.
-    if((isPark&&camState.size>30)||(isWp&&camState.size>34)||(isFac&&camState.size>30)||m.occ){if(!pinching)fadeMarker(m,false);return;}
+    // v2.10.14: PINNED LABELS (user: "把所有地图上的按钮定死在点位上") —
+    // fade and position are SEPARATE decisions now. The transform is
+    // written for EVERY marker on every camera move, visible or not, so a
+    // label stays glued to its anchor through drag, pan and pinch (only
+    // the fade is frozen mid-pinch, v2.10.7). The old early-return skipped
+    // the transform write for a tier-hidden/occluded marker, so mid-pinch
+    // it froze at its old screen spot while the map moved under it
+    // (v2.10.13 diag B2b: L2 drifted 46-64 px). That is gone: a label
+    // fades in exactly on its anchor (anchor tolerance unchanged,
+    // ≤0.05 px), and a label that crosses a tier threshold mid-pinch
+    // simply waits to fade in/out the moment the gesture ends, instead
+    // of flickering while zooming — while its transform keeps tracking.
+    const hidden=(m.isL2&&camState.size>34)||m.occ;
+    if(!pinching)fadeMarker(m,!hidden);
     // v2.9.4: peak labels anchor to the FLAG TOP (m.top), not the summit — the
     // label's bottom edge sits a fixed 13 px above the projected flag top, so it
     // stays glued above its own red flag at every zoom and elevation. (The old
@@ -2075,8 +2079,7 @@ function updateMarkers(){
     // That's the "飘" the user saw in v2.9.3.) Non-peak markers keep the
     // v2.9.3 fixed lift below.
     v3.copy(m.top||m.pos).project(cam);
-    if(v3.z>1){if(!pinching)fadeMarker(m,false);return;}
-    if(!pinching)fadeMarker(m,true); // v2.10.7: frozen during a pinch (already visible; the transform below still tracks the anchor)
+    if(v3.z>1){if(!pinching)fadeMarker(m,false);return;} // behind the camera: no projection possible, keep the last transform
     // v2.9.3: fixed lift — the old lift used cos(camState.el), so the
     // label drifted vertically whenever the elevation changed (flyTo,
     // twist). The lift is a fixed pixel offset: its size-40 screen height
@@ -2093,26 +2096,14 @@ function updateMarkers(){
     // label sits directly above its anchor (dx/dy + lift only).
     const lx0=(v3.x*0.5+0.5)*w+(m.dx||0)*s;
     const ly=(-v3.y*0.5+0.5)*h+(m.dy||0)*s-liftPx;
-    // v2.10.10: pole clearance — 脊生扶桑 sits 7 m from the 初脊峰
-    // summit, so at close range its pill is centred on the pole base
-    // (user 2026-11-25, work/ref-jishengfusang-moved.jpg; v2.10.8 vs
-    // v2.10.9 rendered at the same camera are pixel-identical, so the
-    // position never moved — it is the overlap, not a move). The anchor
-    // stays directly above its point (v2.10.3); only when a waypoint
-    // pill actually overlaps a pole segment is it shifted horizontally
-    // by the minimum to clear (pill half-width + 3 px), to the nearer
-    // side. Recorded on m._poleNudge (0 when none) for the tests.
-    let lx=lx0, _nudge=0;
-    if(isWp){
-      if(m._hw===undefined){m._hw=m.el.offsetWidth/2;m._hh=m.el.offsetHeight;}
-      for(const pl of _poles){
-        if(Math.abs(lx-pl.x)<m._hw+3&&ly>pl.yTop-2&&ly-m._hh<pl.yBot+2){
-          _nudge=lx>=pl.x?(pl.x+m._hw+3-lx):(pl.x-m._hw-3-lx);
-          lx+=_nudge; break;
-        }
-      }
-    }
-    m._poleNudge=_nudge;
+    // v2.10.14: NO pole nudge, NO shift of any kind — the v2.10.10 pole
+    // clearance is deleted (see above): the pill centre is the anchor
+    // (lx0), directly above its point. 脊生扶桑 sits 7 m from the 初脊峰
+    // summit, so at close range its pill sits on the pole again — the
+    // user's explicit trade-off for "定死在点位上" (v2.10.10 added the
+    // nudge for exactly this overlap; v2.10.13 removed it for L2, and
+    // v2.10.14 removes the mechanism entirely).
+    let lx=lx0; // let: the peak edge clamp below still rewrites it
     // v2.10.11: keep peak pills on-screen — the numbered pills are
     // ~30 px wider, so when a peak anchor sits near the right edge the
     // pill ran past it (panorama: 初脊峰 cut to "1号峰 初脊峰 6";

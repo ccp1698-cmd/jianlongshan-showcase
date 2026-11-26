@@ -1,9 +1,10 @@
-// 剑龙山真实感版 v2：Cesium + 本地 heightmap 地形 + Esri 卫星影像。
+// 剑龙山真实感版 v7：Cesium + 本地 heightmap 地形 + Esri 卫星影像。
 // 地形是我们的真实 DEM（136×144），高度真实、无竖向夸张；
 // 四峰标签用 KML 高程（用户已定）；农田不画贴片——卫星图上本来就是真农田。
-// v2（2026-11-26）：范围缩到 20km + 第二阶段全部功能（按 v2.10.11 搬过来：
-// 定位、景区小助理、6 村子、3 停车场、3 设施、补给站标签、13 途点、
-// 40 徒步者、四季（人数/雨）、四峰旗帜、UI/排版）。
+// v7（2026-11-26）：按 4.kml 重建（四峰/路线/途点/设施/停车场/补给站），
+// 功能与 UI 按 v2.11.7 同步：二级标注错开 ±10px + 引出线、二级按距离渐变透明、
+// 近景拖动放慢、四峰弹窗照片、附近推荐固定顺序、访客中心升一级；
+// 山脊支线已删（4.kml 与 v2.10.11 均无）；树/云/水坝/雾不加回来。
 import { DATA } from './data.js';
 
 const $ = (id) => document.getElementById(id);
@@ -161,7 +162,8 @@ try {
   window.__terrainProvider = terrainProvider;
 
   // ---------- 徒步路线：三段环线（穿四峰），橙色；公路灰色 ----------
-  // 黑线改过的路线（round 2）一字不动；山脊支线也是环线的一部分，同色。
+  // 4.kml 的三段路线（登山 24 点/1036m、下山 28 点/889m、应急通道 11 点/308m，
+  // 两段直连 chord 已含在点列里，环线严格闭合）；山脊支线已删（4.kml 里没有）。
   for (const t of DATA.trails) {
     viewer.entities.add({
       name: t.name,
@@ -213,9 +215,9 @@ try {
         verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
       },
     });
-    e._popup = { title: `${p.num}号峰 ${p.short}`, meta: `${p.kmlH} m`, body: DATA.chatPeaks.find((c) => c.id === p.id)?.text || '', photo: null, fly: { lon: p.lon, lat: p.lat, h: p.gridH + 450, pitch: -35 } };
+    e._popup = { title: `${p.num}号峰 ${p.short}`, meta: `${p.kmlH} m`, body: DATA.chatPeaks.find((c) => c.id === p.id)?.text || '', photo: 'peak-' + p.id, fly: { lon: p.lon, lat: p.lat, h: p.gridH + 450, pitch: -35 } };
     peakEntities.push(e);
-    labelItems.push({ entity: e, anchor: pos, tier: 'A', main: false, halfW: 75, halfH: 13, dy: -30 });
+    labelItems.push({ entity: e, anchor: pos, tier: 'A', main: false, halfW: 75, halfH: 13, dy: -30, stag: 0 });
   }
 
   // ---------- 地面高程采样：途点/设施/村子/徒步环线/雨滴，一次批量取 ----------
@@ -226,7 +228,7 @@ try {
     const h = Math.sin(dLa / 2) ** 2 + Math.cos(la1) * Math.cos(la2) * Math.sin(dLo / 2) ** 2;
     return 2 * R * Math.asin(Math.sqrt(h));
   };
-  // 徒步环线：登山→下山→东侧返程收尾（与 v2.10.11 的闭合环一致；支线不走人）
+  // 徒步环线：登山→下山→应急通道收尾（4.kml 三段在归元峰/应急出口/广场三处交汇，严格闭合）
   const loopPts = [
     ...DATA.trails[0].pts,
     ...DATA.trails[1].pts.slice(1),
@@ -295,8 +297,14 @@ try {
   // ---------- 标注点位：L1 地点 + 途点 + 停车场 + 村庄 ----------
   // 点位样式沿用 v2.10.11 的分级（L1 常显、L2/L3 缩小才显），但 Cesium 里按
   // 相机高度分两档：A 档 ≤2000m、B 档 ≤1500m（见 labelItems 注释）。
+  // v2.11.7 同步（v2.11.2）：B 档标注上下交替错开 ±10px（一个计数器按创建顺序
+  // 走遍全部 B 档：途点 → 停车场 → 村庄 → 设施；与 v2.11.7 的 18 个 L2
+  // 相位一致——村庄是 Cesium 才有的 6 个 B 档，偶数个，不打乱后续相位）。
+  // A 档（四峰/一级地点）钉死点位正上方，不错开、无引出线。
   const tierBBoards = []; // B 档公告板（补给站标签、设施图标）：moveEnd 时与 B 档标签同显隐
-  const addMarkerEntity = (lon, lat, h, text, font, popup, tier, halfW) => {
+  let l2StagN = 0;
+  const nextStag = () => (l2StagN++ % 2 === 0 ? -10 : 10);
+  const addMarkerEntity = (lon, lat, h, text, font, popup, tier, halfW, stag = 0) => {
     const pos = Cesium.Cartesian3.fromDegrees(lon, lat, h);
     const e = viewer.entities.add({
       position: pos,
@@ -312,7 +320,7 @@ try {
       },
     });
     if (popup) e._popup = popup;
-    labelItems.push({ entity: e, anchor: pos, tier, main: false, halfW, halfH: tier === 'A' ? 12 : 11, dy: tier === 'A' ? -28 : -26 });
+    labelItems.push({ entity: e, anchor: pos, tier, main: false, halfW, halfH: tier === 'A' ? 12 : 11, dy: tier === 'A' ? -28 : -26 + stag, stag });
     return e;
   };
   if (sampledOk) {
@@ -334,11 +342,16 @@ try {
     }
     // 13 途点：点 + 标签；补给站的标签是画出来的整块 pill（图标贴进标签里，
     // 不是 20 米外的独立标记），所以这两处不用 Cesium 文字标签，只留点位。
+    // v2.11.7 同步（v2.10.14）：访客中心升一级，按 A 档建（仍在 waypoints 数据里，
+    // 只改 marker 等级）；其余 12 个途点是 B 档，交替错开。
     const supplyBoards = viewer.scene.primitives.add(new Cesium.BillboardCollection());
     DATA.waypoints.forEach((w, i) => {
       const h = wpCarts[i].height ?? 600;
       const popup = { title: w.label, meta: '', body: w.text, photo: null, fly: { lon: w.lon, lat: w.lat, h: 900, pitch: -55 } };
-      if (w.fac) {
+      if (w.label === '访客中心') {
+        addMarkerEntity(w.lon, w.lat, h + 8, w.label, 'bold 13px sans-serif', popup, 'A', 70);
+      } else if (w.fac) {
+        const stag = nextStag();
         const pos = Cesium.Cartesian3.fromDegrees(w.lon, w.lat, h + 8);
         const e = viewer.entities.add({
           position: pos,
@@ -359,33 +372,35 @@ try {
         });
         const board = supplyBoards.add({
           position: pos, image: cv, width: 150, height: 22,
-          pixelOffset: new Cesium.Cartesian2(0, -26),
+          pixelOffset: new Cesium.Cartesian2(0, -15 + stag),
           verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
         });
         board._popup = popup;
         board.id = board; // pick 时 picked.id 就是它，_popup 才能被点击处理读到
+        board._stag = stag; // B 档错开：pill 底边离锚点 25px（-10）或 5px（+10）
         tierBBoards.push(board);
         // 补给站的公告板标签不进 declutter（固定在点位正上方，不参与排叠）
       } else {
-        addMarkerEntity(w.lon, w.lat, h + 8, w.label, '11px sans-serif', popup, 'B', 55);
+        addMarkerEntity(w.lon, w.lat, h + 8, w.label, '11px sans-serif', popup, 'B', 55, nextStag());
       }
     });
     // 3 停车场
     DATA.parking.forEach((p, i) => {
       const h = parkCarts[i].height ?? 600;
       addMarkerEntity(p.lon, p.lat, h + 8, '🅿 停车场', '11px sans-serif',
-        { title: `停车场 ${i + 1}`, meta: '景区公路边', body: '停车场，位于景区公路边。', photo: null, fly: { lon: p.lon, lat: p.lat, h: 900, pitch: -55 } }, 'B', 55);
+        { title: `停车场 ${i + 1}`, meta: '景区公路边', body: '停车场，位于景区公路边。', photo: null, fly: { lon: p.lon, lat: p.lat, h: 900, pitch: -55 } }, 'B', 55, nextStag());
     });
     // 6 村子：点位 + “村庄”标注（v2.10.11 里村子没有名字，只有屋群落点；
     // 卫星图上本来就有真实屋顶，这里只落点位+标注，不另建 3D 房子、不编文案）
     DATA.villages.forEach((v, i) => {
       const h = vilCarts[i].height ?? 600;
-      addMarkerEntity(v.lon, v.lat, h + 8, '村庄', '11px sans-serif', null, 'B', 40);
+      addMarkerEntity(v.lon, v.lat, h + 8, '村庄', '11px sans-serif', null, 'B', 40, nextStag());
     });
     // 3 设施：图标公告板（医疗红十字 / WC 徽），不带文字
     const facBoards = viewer.scene.primitives.add(new Cesium.BillboardCollection());
     DATA.facilities.forEach((f, i) => {
       const h = facCarts[i].height ?? 600;
+      const stag = nextStag();
       const cv = makeCanvas(40, 40, (ctx) => {
         if (f.kind === 'med') drawMed(ctx, 2, 2, 36);
         else drawWc(ctx, 2, 2, 36);
@@ -393,10 +408,12 @@ try {
       const board = facBoards.add({
         position: Cesium.Cartesian3.fromDegrees(f.lon, f.lat, h + 10),
         image: cv, width: 20, height: 20,
+        pixelOffset: new Cesium.Cartesian2(0, -15 + stag),
         verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
       });
       board._popup = { title: f.label, meta: '', body: f.text, photo: null, fly: { lon: f.lon, lat: f.lat, h: 900, pitch: -55 } };
       board.id = board; // pick 时 picked.id 就是它
+      board._stag = stag; // B 档错开：图标底边离锚点 25px（-10）或 5px（+10）
       tierBBoards.push(board);
     });
   }
@@ -542,6 +559,16 @@ try {
   // (d) 切换视角、手动缩放/拖动、窗口尺寸变化后都重新排
   //     （camera.moveEnd + 300ms 后再排一次防惯性未停稳 + resize，
   //     飞行落定后的 1900ms 定时是兜底）。
+  // ---------- 引出线（v2.11.7 同步 v2.11.6）：B 档标注各一条线，从 pill 底边连回自己的锚点 ----------
+  // SVG 覆盖层盖在 canvas 上（pointer-events:none，不挡点击/拖动）；线 1px、#4a5a50、
+  // 基础不透明度 0.45，再乘以该标注的距离不透明度；随 pill 每帧移动、随 pill 一起显隐。
+  // A 档（四峰/一级）无引出线。线数据存在 window.__leaderLines 里供探针核对。
+  const leaderSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  leaderSvg.setAttribute('id', 'leaderLines');
+  leaderSvg.setAttribute('style', 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:2');
+  $('cesiumContainer').appendChild(leaderSvg);
+  const leaderPool = []; // 复用 <line>，免得每帧重建 DOM
+  window.__leaderLines = [];
   // 坑：e.label.show 是 Property 对象，恒为真值——不能用 !e.label.show
   // 判断，必须用本地布尔值 shown，否则出界标签会混进排叠、把别的标签全挤掉。
   const MIN_GAP = 28;
@@ -552,6 +579,12 @@ try {
     const h = viewer.camera.positionCartographic.height;
     const showA = labelsEnabled && h <= 2000;
     const showB = labelsEnabled && h <= 1500;
+    // v2.11.7 同步（v2.11.1/v2.11.2）：B 档标注按相机距离渐变透明——
+    // 拉远（h≥1500m）0.6、拉近（h≤1150m）1.0，中间线性；A 档可见时恒 1.0。
+    // 映射口径：Three.js size 35（全景）↔ h 1500m，size 12（近景）↔ h 1150m；
+    // B 档只在 h≤1500m 显示，所以 0.6→1.0 的渐变正好落在它的可见区间里。
+    const distOp = h >= 1500 ? 0.6 : h <= 1150 ? 1.0 : 0.6 + 0.4 * (1500 - h) / 350;
+    const leaderData = []; // 本轮的引出线：{x1,y1,x2,y2,op}，pill 底边中心 → 自己的锚点
     const cw = viewer.scene.canvas.clientWidth, ch = viewer.scene.canvas.clientHeight;
     const viewsTop = $('views').getBoundingClientRect().top;
     const titleRect = $('title').getBoundingClientRect();
@@ -569,12 +602,24 @@ try {
       const shown = showTier && inView;
       it.entity.label.show = shown;
       if (!shown) continue;
+      // 距离透明度：B 档按 distOp 渐变，A 档恒 1.0（每轮重设，高度变化后跟上）
+      const op = it.tier === 'A' ? 1 : distOp;
+      const L = it.entity.label;
+      L.fillColor = Cesium.Color.WHITE.withAlpha(op);
+      L.outlineColor = Cesium.Color.BLACK.withAlpha(op);
+      L.backgroundColor = Cesium.Color.fromCssColorString(`rgba(10,20,35,${(0.78 * op).toFixed(3)})`);
       items.push({ ...it, x: s.x, y: s.y, main: it.entity === currentMainPeak });
     }
     // B 档公告板（补给站标签、设施图标）：与 B 档标签同显隐（只判高度+视口，不排叠）
+    // 透明度与 B 档标签同步；引出线从公告板底边中心连回锚点（底边离锚点 25px 或 5px）
     for (const b of tierBBoards) {
       const s = viewer.scene.cartesianToCanvasCoordinates(b.position);
       b.show = showB && !!s && s.x > 10 && s.x < cw - 10 && s.y > 10 && s.y < ch - 10;
+      if (b.show) {
+        b.color = Cesium.Color.WHITE.withAlpha(distOp);
+        const bottomY = s.y - 15 + (b._stag || 0);
+        leaderData.push({ x1: s.x, y1: bottomY, x2: s.x, y2: s.y, op: distOp });
+      }
     }
     // (c) 横向夹紧：pill 不出视口左右；若 pill 大幅压住标题卡，横向挪开
     //     （标题卡在小屏上占半幅宽，只上下移会把标签挤出安全带；
@@ -597,13 +642,18 @@ try {
       return ox;
     };
     const placeOne = (it, target) => {
-      it.entity.label.pixelOffset = new Cesium.Cartesian2(computeOx(it, target), target - it.y + it.halfH);
+      const ox = computeOx(it, target);
+      it.entity.label.pixelOffset = new Cesium.Cartesian2(ox, target - it.y + it.halfH);
       window.__labelBoxes.push({
         name: it.entity.name || it.entity._popup?.title || '',
-        x: Math.round(it.x + computeOx(it, target) - it.halfW), y: Math.round(target - it.halfH),
+        x: Math.round(it.x + ox - it.halfW), y: Math.round(target - it.halfH),
         w: it.halfW * 2, h: it.halfH * 2,
         ax: Math.round(it.x), ay: Math.round(it.y), // 锚点（供验证：pill 不得压住自己的锚点圆点）
       });
+      // B 档引出线：从 pill 底边中心连回自己的锚点（pill 被排叠挪开后线跟着走）
+      if (it.tier === 'B') {
+        leaderData.push({ x1: it.x + ox, y1: target + it.halfH, x2: it.x, y2: it.y, op: distOp });
+      }
       return target;
     };
     const hitsTitle = (centerY, x, ox = 0, halfW = 75, halfH = 13) => {
@@ -639,7 +689,8 @@ try {
         if (target < safeTop) target = safeTop;
         if (target > safeBottom) { it.entity.label.show = false; continue; }
         // 往下排时 pill 底缘不得压住自己的锚点圆点：排不下就隐藏，不硬盖
-        if (target + it.halfH > it.y - 6) { it.entity.label.show = false; continue; }
+        // （B 档 +10 的 pill 自然底缘离锚点只有 5px，阈值放宽到 3px 才留得住）
+        if (target + it.halfH > it.y - (it.tier === 'B' ? 3 : 6)) { it.entity.label.show = false; continue; }
         prev = placeOne(it, target);
       }
     } else {
@@ -666,10 +717,29 @@ try {
         if (target < prevBelow + MIN_GAP) target = prevBelow + MIN_GAP;
         if (target > safeBottom) { it.entity.label.show = false; continue; }
         // 往下排时 pill 底缘不得压住自己的锚点圆点：排不下就隐藏，不硬盖
-        if (target + it.halfH > it.y - 6) { it.entity.label.show = false; continue; }
+        // （B 档 +10 的 pill 自然底缘离锚点只有 5px，阈值放宽到 3px 才留得住）
+        if (target + it.halfH > it.y - (it.tier === 'B' ? 3 : 6)) { it.entity.label.show = false; continue; }
         prevBelow = placeOne(it, target);
       }
     }
+    // 引出线同步到 SVG：只画本轮已放置的 B 档（隐藏的标注线也隐藏）
+    window.__leaderLines = leaderData;
+    leaderData.forEach((d, i) => {
+      let ln = leaderPool[i];
+      if (!ln) {
+        ln = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        ln.setAttribute('stroke', '#4a5a50');
+        ln.setAttribute('stroke-width', '1');
+        ln.setAttribute('stroke-linecap', 'round');
+        leaderSvg.appendChild(ln);
+        leaderPool.push(ln);
+      }
+      ln.setAttribute('x1', d.x1.toFixed(1)); ln.setAttribute('y1', d.y1.toFixed(1));
+      ln.setAttribute('x2', d.x2.toFixed(1)); ln.setAttribute('y2', d.y2.toFixed(1));
+      ln.setAttribute('stroke-opacity', (0.45 * d.op).toFixed(3));
+      ln.style.display = '';
+    });
+    for (let i = leaderData.length; i < leaderPool.length; i++) leaderPool[i].style.display = 'none';
     viewer.scene.requestRender();
   };
   window.__declutter = declutterLabels;
@@ -677,6 +747,11 @@ try {
     labelsEnabled, mainPeak: currentMainPeak ? currentMainPeak.name : null,
     height: viewer.camera.positionCartographic.height,
     labelBoxes: window.__labelBoxes.length,
+    distOp: viewer.camera.positionCartographic.height >= 1500 ? 0.6
+      : viewer.camera.positionCartographic.height <= 1150 ? 1.0
+      : 0.6 + 0.4 * (1500 - viewer.camera.positionCartographic.height) / 350,
+    leaderLines: window.__leaderLines.length,
+    l2StagN,
   });
   viewer.camera.moveEnd.addEventListener(() => {
     viewer.scene.globe.maximumScreenSpaceError = REST_MSSE; // 停稳恢复全细节
@@ -689,7 +764,107 @@ try {
     setTimeout(() => { viewer.scene.globe.maximumScreenSpaceError = REST_MSSE; }, 200);
   });
 
-  // ---------- 视角预设 ----------
+  // ---------- 近景拖动放慢（v2.11.7 同步 v2.11.3）：拉得越近转得越慢，全景不变 ----------
+  // 实测（v6，2026-11-26）：Cesium 的左拖是 pan3D——相机沿地面平移、朝向不变，
+  // 地面点 1:1 跟随手指；近景时锚点（峰）比拾取点（视野中心地面）离相机近得多，
+  // 视差让锚点屏上位移 193px/100px，比全景 114px 快 1.69 倍。
+  // 做法：关掉控制器的左拖（enableRotate=false，只关 spin3D；捏合、滚轮、右拖、
+  // 倾斜、Shift+拖动都不走这条路，不受影响），自己接 LEFT_DRAG，用同样的
+  // “拾取点跟随手指”平移，但把手指位移乘一个随相机高度变化的缩放系数。
+  // 系数用两处实测标定：全景 h=3000m 时 1.0，1号峰近景 h≈1150m 时 0.59
+  // （193×0.59≈114，与全景一致），中间线性，低于 1150m 不低于 0.3。
+  const dragScaleForHeight = (hh) => {
+    const s = 0.59 + (hh - 1150) * 0.41 / 1850;
+    return Math.min(1, Math.max(0.3, s));
+  };
+  window.__dragScaleForHeight = dragScaleForHeight;
+  ctrl.enableRotate = false; // 控制器左拖（spin3D/pan3D）停用，改走下面的缩放版
+  const dragState = { pick: null, startMouse: null, lastT: null, lastMoveAt: 0, prevMoveAt: 0, glideTimer: null };
+  window.__dragDebug = { down: 0, drag: 0, up: 0, dragNoPick: 0, dragNullRay: 0, dragErr: '' };
+  const dragGlobePick = (mx, my) => {
+    try {
+      const ray = viewer.camera.getPickRay(new Cesium.Cartesian2(mx, my));
+      if (!ray) return null;
+      const p = viewer.scene.globe.pick(ray, viewer.scene);
+      if (p) return p;
+      return viewer.camera.pickEllipsoid(new Cesium.Cartesian2(mx, my), viewer.scene.globe.ellipsoid) || null;
+    } catch (e) { return null; }
+  };
+  // 把 dragState.pick 平移到“虚拟手指”(mx,my) 的射线上去：相机纯平移，朝向不动
+  const dragTranslateTo = (mx, my) => {
+    const cam = viewer.camera;
+    const d = Cesium.Cartesian3.distance(dragState.pick, cam.position);
+    const ray = cam.getPickRay(new Cesium.Cartesian2(mx, my));
+    if (!ray) return null;
+    const p1 = Cesium.Cartesian3.add(cam.position, Cesium.Cartesian3.multiplyByScalar(ray.direction, d, new Cesium.Cartesian3()), new Cesium.Cartesian3());
+    const T = Cesium.Cartesian3.subtract(dragState.pick, p1, new Cesium.Cartesian3());
+    Cesium.Cartesian3.add(cam.position, T, cam.position);
+    return T;
+  };
+  const stopDragGlide = () => {
+    if (dragState.glideTimer) { clearInterval(dragState.glideTimer); dragState.glideTimer = null; }
+  };
+  window.__stopDragGlide = stopDragGlide;
+  viewer.screenSpaceEventHandler.setInputAction((movement) => {
+    stopDragGlide();
+    window.__dragDebug.down++;
+    // 注意：LEFT_DOWN 传的是 {position}（不是直接的 Cartesian2），
+    // 写成 pos.x 会是 undefined、起点拾到左上角 (0,0)——v7 第一版就栽在这里。
+    const pos = movement.position;
+    dragState.pick = dragGlobePick(pos.x, pos.y);
+    dragState.startMouse = { x: pos.x, y: pos.y };
+    dragState.lastT = null;
+    dragState.lastMoveAt = 0; dragState.prevMoveAt = 0;
+  }, Cesium.ScreenSpaceEventType.LEFT_DOWN);
+  // 注意：ScreenSpaceEventHandler 根本不发 LEFT_DRAG——拖动是 CameraEventAggregator
+  // （控制器内部自己建的 handler）用 MOUSE_MOVE + DOWN/UP 合成的；在本 handler 上
+  // 注册 LEFT_DRAG 永远不会触发（v7 第二版就栽在这里，drag 计数恒为 0）。
+  // 所以这里接 MOUSE_MOVE，靠 LEFT_DOWN/LEFT_UP 维护的拖动状态判断是否在左拖中。
+  viewer.screenSpaceEventHandler.setInputAction((movement) => {
+    window.__dragDebug.drag++;
+    if (!dragState.pick || !dragState.startMouse) { window.__dragDebug.dragNoPick++; return; } // 没按着左键拖（只是移动鼠标）或起点是天空：不动
+    const s = dragState.startMouse, e = movement.endPosition;
+    const scale = dragScaleForHeight(viewer.camera.positionCartographic.height);
+    const vx = s.x + (e.x - s.x) * scale;
+    const vy = s.y + (e.y - s.y) * scale;
+    let T = null;
+    try {
+      T = dragTranslateTo(vx, vy);
+    } catch (err) { window.__dragDebug.dragErr = String(err).slice(0, 150); return; }
+    if (!T) { window.__dragDebug.dragNullRay++; return; }
+    dragState.prevMoveAt = dragState.lastMoveAt || Date.now();
+    dragState.lastMoveAt = Date.now();
+    dragState.lastT = T;
+    viewer.scene.requestRender();
+  }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
+  // 松开后滑行：按最后一次平移速度衰减（0.85/帧，约 200ms 停），与控制器惯性同感；
+  // 速度按毫秒归一化（mousemove 间隔不固定），总量封顶，不会飞出去
+  viewer.screenSpaceEventHandler.setInputAction(() => {
+    window.__dragDebug.up++;
+    const pick = dragState.pick;
+    dragState.pick = null;
+    if (!pick || !dragState.lastT || Date.now() - dragState.lastMoveAt > 300) return;
+    const dt = Math.max(8, dragState.lastMoveAt - dragState.prevMoveAt);
+    const vel = Cesium.Cartesian3.multiplyByScalar(dragState.lastT, 1 / dt, new Cesium.Cartesian3()); // 米/毫秒
+    const speed = Cesium.Cartesian3.magnitude(vel);
+    if (speed < 0.01) return; // 太慢就不用滑了
+    let i = 0;
+    dragState.glideTimer = setInterval(() => {
+      i++;
+      const f = Math.pow(0.85, i);
+      if (f < 0.05 || i > 12) { stopDragGlide(); return; }
+      const step = Cesium.Cartesian3.multiplyByScalar(vel, 16 * f, new Cesium.Cartesian3());
+      Cesium.Cartesian3.add(viewer.camera.position, step, viewer.camera.position);
+      viewer.scene.requestRender();
+    }, 16);
+  }, Cesium.ScreenSpaceEventType.LEFT_UP);
+  window.__dragState = dragState;
+
+  // ---------- 视角预设（v2.11.7 的 9 个：全景/鸟瞰/1/2/3/5号峰/入口/出口/水库） ----------
+  // 峰预设按公式（峰经度，峰纬度-0.004，gridH+450，-35°）自动跟峰位走，
+  // 归元峰东南移 62.6m 后预设也跟着移（v2.11.0 的重拟合在 Cesium 里由公式承担，
+  // 渲染时再验）；入口/出口预设按 v2.11.7 的视角（入口 107.041,23.1581；出口
+  // 107.040969,23.156357）用同一公式换算：相机在目标南 0.004°、地面高 +450m。
   const fly = (lon, lat, height, pitchDeg, duration = 1.6) => {
     viewer.camera.flyTo({
       destination: Cesium.Cartesian3.fromDegrees(lon, lat, height),
@@ -700,12 +875,15 @@ try {
   window.__fly = fly;
   const views = [
     { name: '全景', labels: false, run: () => fly(107.0365, 23.1445, 3000, -55) },
+    { name: '鸟瞰', labels: false, run: () => fly(107.0365, 23.1550, 3000, -90) },
     ...DATA.peaks.map((p, j) => ({
       name: `${p.num}号峰 ${p.short}`,
       labels: true,
       peak: peakEntities[j],
       run: () => fly(p.lon, p.lat - 0.004, p.gridH + 450, -35),
     })),
+    { name: '入口', labels: true, run: () => fly(107.041, 23.1581 - 0.004, (entCart.height ?? 488) + 450, -35) },
+    { name: '出口', labels: true, run: () => fly(107.040969, 23.156357 - 0.004, (parkExitCart.height ?? 498) + 450, -35) },
     { name: '伏曼水库', labels: false, run: () => fly(DATA.lake.center[0], DATA.lake.center[1] - 0.0035, 1700, -55) },
   ];
   const viewsEl = $('views');
@@ -719,6 +897,7 @@ try {
       window.__view = v.name;
       labelsEnabled = v.labels !== false;
       currentMainPeak = v.peak || null;
+      stopDragGlide(); // 预设飞行前停掉手动拖动的滑行，免得滑行和飞行打架
       v.run();
       b.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
       setTimeout(declutterLabels, 1900); // 飞行 1.6s 落定后再排标签（moveEnd 也会触发一次）
@@ -883,7 +1062,7 @@ try {
       fly(lon, lat, h, -55);
       geoToast(`已定位，精度约 ±${Math.round(acc || 20)} 米`);
     }
-    if (!$('sheet-nearby').hidden) nearbyRender();
+    // 附近推荐是固定顺序（v2.11.5），定位后不重排，这里不再刷新面板
   }
   function onGeoErr() {
     if (geoWatch === null) return;
@@ -914,7 +1093,11 @@ try {
   $('locateBtn').addEventListener('click', () => { if (geoWatch !== null) stopLocate(); else startLocate(); });
   window.__locateState = () => ({ watching: geoWatch !== null, userLoc });
 
-  // ---------- 附近推荐（v2.10.11 同款：直线距离，用户定位后按 GPS 重排） ----------
+  // ---------- 附近推荐（v2.11.7 同步：固定顺序，定位不重排） ----------
+  // 顺序固定为峒那屿湾、伏那秘境、德天瀑布、名仕田园（DATA.nearby 的数组顺序）；
+  // 距离一律从剑龙山景区中心算，定位后也不按 GPS 重排（v2.11.5 的用户决定）；
+  // 伏那秘境用真实坐标 (107.02, 22.86)，显示约 32.8 公里；四家导航统一走
+  // 高德名称搜索（v2.10.2 的方式，v2.11.7 修正后确认）。定位只显示蓝点。
   const JLS_CENTER = { lon: 107.0365, lat: 23.1550 };
   function nearbyDistM(aLon, aLat, bLon, bLat) {
     const R = 6371000, dLa = (bLat - aLat) * Math.PI / 180, dLo = (bLon - aLon) * Math.PI / 180;
@@ -923,63 +1106,57 @@ try {
     return 2 * R * Math.asin(Math.sqrt(h));
   }
   const nearbyFmt = (m) => (m < 1000 ? '约 ' + Math.round(m) + ' 米' : '约 ' + (m / 1000).toFixed(1) + ' 公里');
-  const nearbyRef = () => (userLoc ? { lon: userLoc.lon, lat: userLoc.lat, gps: true } : { lon: JLS_CENTER.lon, lat: JLS_CENTER.lat, gps: false });
-  const nearbySorted = () => {
-    const ref = nearbyRef();
-    return DATA.nearby.map((s) => ({ s, d: s.est ? Infinity : nearbyDistM(ref.lon, ref.lat, s.lon, s.lat) })).sort((a, b) => a.d - b.d);
-  };
+  const nearbySorted = () => DATA.nearby.map((s) => ({ s, d: nearbyDistM(JLS_CENTER.lon, JLS_CENTER.lat, s.lon, s.lat) }));
   const nearbyNavUrl = (name) => 'https://uri.amap.com/search?keyword=' + encodeURIComponent(name);
   function nearbyOpenSpot(s) {
-    const ref = nearbyRef();
-    const d = nearbyDistM(ref.lon, ref.lat, s.lon, s.lat);
-    const meta = s.est ? '' : (s.grade ? s.grade + ' · ' : '') + nearbyFmt(d) + '（直线距离）';
+    const d = nearbyDistM(JLS_CENTER.lon, JLS_CENTER.lat, s.lon, s.lat);
+    const meta = (s.grade ? s.grade + ' · ' : '') + nearbyFmt(d) + '（直线距离）';
     showDetail(s.name, meta, s.intro + '\n位置：' + s.loc, null, nearbyNavUrl(s.name), null);
   }
   function nearbyRender() {
     const list = $('nearbyList'), note = $('nearbyNote');
     if (!list) return;
-    const ref = nearbyRef();
-    if (note) note.textContent = ref.gps ? '距你当前位置（GPS）· 直线距离（非车程）' : '距剑龙山景区中心 · 直线距离（非车程），点右上角 ◎ 定位后按你的位置排';
+    if (note) note.textContent = '距剑龙山景区中心 · 直线距离（非车程）';
     list.innerHTML = '';
     for (const it of nearbySorted()) {
       const s = it.s;
       const row = document.createElement('div');
       row.className = 'nrow';
-      row.innerHTML = '<div class="nhead"><span class="nico">' + s.icon + '</span><span class="nname">' + s.name + '</span><span class="ndist">' + (s.est ? '' : nearbyFmt(it.d)) + '</span></div><div class="nintro">' + s.intro + '</div><div class="nloc">' + s.loc + '</div>';
+      row.innerHTML = '<div class="nhead"><span class="nico">' + s.icon + '</span><span class="nname">' + s.name + '</span><span class="ndist">' + nearbyFmt(it.d) + '</span></div><div class="nintro">' + s.intro + '</div><div class="nloc">' + s.loc + '</div>';
       row.addEventListener('click', () => nearbyOpenSpot(s));
       list.appendChild(row);
     }
   }
   function nearbyChatHtml() {
-    const ref = nearbyRef();
     const items = nearbySorted();
-    let h = ref.gps ? '📍 附近推荐景点（距你当前位置，直线距离）：<br>'
-      : '未定位，按地图中心排序，点右上角 ◎ 定位后更准<br>📍 附近推荐景点（距剑龙山景区中心，直线距离）：<br>';
+    let h = '📍 附近推荐景点（距剑龙山景区中心，直线距离）：<br>';
     h += items.map((it, i) => {
       const s = it.s;
-      return (i + 1) + '. <b>' + s.name + '</b>' + (s.est ? '' : ' · ' + nearbyFmt(it.d)) + '<br><span style="color:#cfe0ef">' + s.intro + '</span><br>' +
+      return (i + 1) + '. <b>' + s.name + '</b>' + ' · ' + nearbyFmt(it.d) + '<br><span style="color:#cfe0ef">' + s.intro + '</span><br>' +
         '<button class="mapbtn" data-near="' + s.name + '">📖 简介</button> ' +
         '<a class="mapbtn" href="' + nearbyNavUrl(s.name) + '" target="_blank" rel="noopener">🧭 导航</a>';
     }).join('<br>');
     return h;
   }
 
-  // ---------- 景区小助理：轻量关键词问答（内容照搬 v2.10.11，数字按 Cesium 现状改） ----------
-  // 改了两处数字（见 BUILD-NOTES）：环线 2.2km→2.1km、三段 999/828/348m→778/833/536m
-  // （黑线改线后的实测长度）；四峰标高用 KML（637/693/694/677，与地图标签一致）。
+  // ---------- 景区小助理：轻量关键词问答（内容照 v2.11.7，数字按 4.kml 改） ----------
+  // 环线 2.1km→2.2km、三段 778/833/536m→1036/889/308m（4.kml 实测长度，
+  // 含两段直连 chord）；第三段名字从“东侧返程”改成“应急通道（下山中间的路）”；
+  // 入口按钮坐标改成 4.kml 的登山入口 (107.0407, 23.158298)；
+  // 四峰标高用 KML（637/693/694/677，与地图标签一致）。
   // 其余文案（时间、门票、电话、地址）一字不动。
   const CHAT_TOPICS = [
     { id: 'nearby', label: '附近推荐景点', kw: ['附近', '推荐', '最近', '周边', '周围', '去哪'], ans: '', nearby: true },
     { id: 'peaks', label: '四峰导览', kw: ['四峰', '峰', '初脊', '剑板', '天柱', '归元', '山峰', '板峰', '看什么', '景点'],
       ans: '剑龙山四峰，点一个看介绍，也可以点“📍 在地图上看”飞过去。', peaks: true },
     { id: 'route', label: '水库环线', nochip: true, kw: ['环线', '路线', '登山', '下山', '怎么走', '怎么玩', '行程', '徒步', '爬山'],
-      ans: '🗺️ 水库环线（全长约 2.1 公里，闭合环线）：\n· 登山路线：自水库北岸上归元峰，约 778 米\n· 下山路线：自归元峰下至东侧应急出口，约 833 米\n· 东侧返程：自应急出口连回水库北岸，约 536 米，园区出口在通道起点旁与村道交汇处\n登山线与下山线在归元峰交汇，三段闭合成环，不走回头路。' },
+      ans: '🗺️ 水库环线（全长约 2.2 公里，闭合环线）：\n· 登山路线：自水库北岸登山入口上归元峰，约 1036 米\n· 下山路线：自归元峰下至东侧应急出口，约 889 米\n· 应急通道（下山中间的路）：自应急出口连回登山入口，约 308 米，园区出口在通道起点旁与村道交汇处\n登山线与下山线在归元峰交汇，三段闭合成环，不走回头路。' },
     { id: 'hours', label: '开放时间', kw: ['时间', '几点', '开门', '关门', '开放', '营业', '晨爬', '日爬', '夕爬', '截止'],
       ans: '🕗 开放时间 5:00–19:00，17:00 截止入园。\n· 晨爬 5:00–8:00\n· 日爬 8:00–15:00\n· 夕爬 15:00–17:00\n时间请以景区当日公示为准。' },
     { id: 'ticket', label: '门票价格', kw: ['门票', '票价', '多少钱', '价格', '收费', '票', '优惠', '免费'],
       ans: '🎫 门票价格以景区当日公示为准。\n可拨打景区咨询电话 <a href="tel:07716467699">0771-6467699</a> 确认。' },
     { id: 'entrance', label: '登山入口', kw: ['入口', '进门', '从哪进', '起点', '广场', '集散'],
-      ans: '🚶 登山入口在水库北岸，是水库环线登山路线的起点。\n访客集散广场在入口旁（水库北岸公路旁），停车、集散、出发都在这里。\n<button class="mapbtn" data-lon="107.040649" data-lat="23.15863" data-size="9">📍 在地图上看</button>' },
+      ans: '🚶 登山入口在水库北岸，是水库环线登山路线的起点。\n访客集散广场在入口旁（水库北岸公路旁），停车、集散、出发都在这里。\n<button class="mapbtn" data-lon="107.0407" data-lat="23.158298" data-size="9">📍 在地图上看</button>' },
     { id: 'exit', label: '出口与应急', kw: ['出口', '出门', '应急', '安全', '迷路', '下山出口'],
       ans: '🚪 园区出口在应急通道起点旁（下山路线终点附近），村道通往公路。\n🆘 应急出口在下山路线终点（原园区出口处）。如需帮助可拨打 <a href="tel:07716467699">0771-6467699</a>。' },
     { id: 'lake', label: '伏曼水库', kw: ['水库', '伏曼', '湖', '水', '岛'],
@@ -989,7 +1166,7 @@ try {
     { id: 'phone', label: '咨询电话', kw: ['电话', '咨询', '联系', '客服', '预约'],
       ans: '📞 景区咨询电话：<a href="tel:07716467699">0771-6467699</a>\n点号码可以直接拨打。票价、时间请以景区当日公示为准。' },
     { id: 'intro', label: '景区简介', kw: ['简介', '介绍', '什么地方', '好玩吗', '怎么样', '剑龙山'],
-      ans: '⛰️ 剑龙山在广西崇左市天等县，四座板峰如剑龙背板般沿山脊排开，东侧是碧绿的伏曼水库。\n水库环线全长约 2.1 公里，自水库北岸出发，经归元峰环绕一圈回到起点。' },
+      ans: '⛰️ 剑龙山在广西崇左市天等县，四座板峰如剑龙背板般沿山脊排开，东侧是碧绿的伏曼水库。\n水库环线全长约 2.2 公里，自水库北岸登山入口出发，经归元峰环绕一圈回到起点。' },
   ];
   const CHAT_FALLBACK = '这个问题我还不太清楚，你可以点下面的快捷问题，或直接拨打景区咨询电话 <a href="tel:07716467699">0771-6467699</a>。';
   const chatPanel = $('chatPanel'), chatMsgs = $('chatMsgs'), chatChips = $('chatChips'), chatInput = $('chatInput');
@@ -1275,6 +1452,9 @@ try {
       let activeName = null;
       if (best && bestIdx >= 0 && restoredView.h <= 2000) activeName = `${DATA.peaks[bestIdx].num}号峰 ${DATA.peaks[bestIdx].short}`;
       else if (Math.abs(restoredView.lon - 107.0365) < 0.001 && Math.abs(restoredView.lat - 23.1445) < 0.001 && Math.abs(restoredView.h - 3000) < 50) activeName = '全景';
+      else if (Math.abs(restoredView.lon - 107.0365) < 0.001 && Math.abs(restoredView.lat - 23.1550) < 0.001 && Math.abs(restoredView.h - 3000) < 50) activeName = '鸟瞰';
+      else if (Math.abs(restoredView.lon - 107.041) < 0.001 && Math.abs(restoredView.lat - (23.1581 - 0.004)) < 0.001 && Math.abs(restoredView.h - ((entCart.height ?? 488) + 450)) < 150) activeName = '入口';
+      else if (Math.abs(restoredView.lon - 107.040969) < 0.001 && Math.abs(restoredView.lat - (23.156357 - 0.004)) < 0.001 && Math.abs(restoredView.h - ((parkExitCart.height ?? 498) + 450)) < 150) activeName = '出口';
       else if (Math.abs(restoredView.lon - DATA.lake.center[0]) < 0.001 && Math.abs(restoredView.lat - (DATA.lake.center[1] - 0.0035)) < 0.001 && Math.abs(restoredView.h - 1700) < 50) activeName = '伏曼水库';
       if (activeName) { const ab = viewBtns.find((x) => x.textContent === activeName); if (ab) ab.classList.add('active'); }
       window.__view = '已恢复';
@@ -1311,6 +1491,9 @@ try {
     season: curSeason,
     labels: labelItems.length,
     loopTotalM: Math.round(loopTotal),
+    views: views.map((v) => v.name),
+    dragSlowdown: ctrl.enableRotate === false,
+    leaderLines: window.__leaderLines.length,
   };
   setStatus('就绪：地形 + 影像 + 标注');
   log('就绪，实体数 ' + viewer.entities.values.length + '，标签 ' + labelItems.length + '，环线 ' + Math.round(loopTotal) + 'm');

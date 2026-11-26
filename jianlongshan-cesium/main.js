@@ -1,4 +1,4 @@
-// 剑龙山真实感版 v9：Cesium + 本地 heightmap 地形 + Esri 卫星影像。
+// 剑龙山真实感版 v10：Cesium + 本地 heightmap 地形 + Esri 卫星影像。
 // v9（2026-11-26）：界面换肤——按 Three.js v2.11.8 参考图：白底 pill 标注（红字标高）、
 // 浅蓝虚线路线、顶栏 logo + 附近 pill + 刷新/首页、底部 6 按钮 dock、聊天 FAB 深色圆；
 // 地形/影像/数据一字不动；v8 高清三项（DPR 2.0、影像 17 级、msse 2）保留。
@@ -86,10 +86,10 @@ try {
   // provider 要设 tileWidth/tileHeight 512；卫星是 256×256 JPEG。
   // 4 种风格共用同一个 ARCGIS_API_KEY；影像矩形与 Esri 署名与之前一致。
   const BASEMAPS = [
-    { id: 'imagery', name: '卫星', chip: '真实卫星影像', note: 'Esri 卫星影像（默认，真实感最强）。', url: 'https://ibasemaps-api.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}?token=' + ARCGIS_API_KEY, tileSize: 256 },
-    { id: 'outdoor', name: '地形', chip: '地形 · 等高线 · 水系', note: 'ArcGIS Outdoor：地形、等高线、山脊水系，适合看地形。', url: 'https://static-map-tiles-api.arcgis.com/arcgis/rest/services/static-basemap-tiles-service/v1/arcgis/outdoor/static/tile/{z}/{y}/{x}?token=' + ARCGIS_API_KEY, tileSize: 512 },
-    { id: 'streets', name: '街道', chip: '道路 · 村庄 · 建筑', note: 'ArcGIS Streets：道路、村庄、建筑，适合看路网。', url: 'https://static-map-tiles-api.arcgis.com/arcgis/rest/services/static-basemap-tiles-service/v1/arcgis/streets/static/tile/{z}/{y}/{x}?token=' + ARCGIS_API_KEY, tileSize: 512 },
-    { id: 'dark', name: '深灰', chip: '深色底图，标注醒目', note: 'ArcGIS Dark Gray：深色底图，路线和标注更醒目。', url: 'https://static-map-tiles-api.arcgis.com/arcgis/rest/services/static-basemap-tiles-service/v1/arcgis/dark-gray/static/tile/{z}/{y}/{x}?token=' + ARCGIS_API_KEY, tileSize: 512 },
+    { id: 'imagery', name: '卫星', chip: '真实卫星影像', note: 'Esri 卫星影像（默认，真实感最强）。', url: 'https://ibasemaps-api.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}?token=' + ARCGIS_API_KEY, tileSize: 256, color: { saturation: 1.40, contrast: 1.15, brightness: 1.02, gamma: 0.98 } },
+    { id: 'outdoor', name: '地形', chip: '地形 · 等高线 · 水系', note: 'ArcGIS Outdoor：地形、等高线、山脊水系，适合看地形。', url: 'https://static-map-tiles-api.arcgis.com/arcgis/rest/services/static-basemap-tiles-service/v1/arcgis/outdoor/static/tile/{z}/{y}/{x}?token=' + ARCGIS_API_KEY, tileSize: 512, color: { saturation: 1.15, contrast: 1.05, brightness: 1.0, gamma: 1.0 } },
+    { id: 'streets', name: '街道', chip: '道路 · 村庄 · 建筑', note: 'ArcGIS Streets：道路、村庄、建筑，适合看路网。', url: 'https://static-map-tiles-api.arcgis.com/arcgis/rest/services/static-basemap-tiles-service/v1/arcgis/streets/static/tile/{z}/{y}/{x}?token=' + ARCGIS_API_KEY, tileSize: 512, color: { saturation: 1.10, contrast: 1.03, brightness: 1.0, gamma: 1.0 } },
+    { id: 'dark', name: '深灰', chip: '深色底图，标注醒目', note: 'ArcGIS Dark Gray：深色底图，路线和标注更醒目。', url: 'https://static-map-tiles-api.arcgis.com/arcgis/rest/services/static-basemap-tiles-service/v1/arcgis/dark-gray/static/tile/{z}/{y}/{x}?token=' + ARCGIS_API_KEY, tileSize: 512, color: { saturation: 1.0, contrast: 1.0, brightness: 1.0, gamma: 1.0 } },
   ];
   // 底图选择持久化：localStorage，下次打开恢复上次的风格（与视角记忆同一套做法；
   // 视角记忆只在窄屏，底图选择是用户偏好，宽屏窄屏都存取）。
@@ -109,7 +109,20 @@ try {
     rectangle: Cesium.Rectangle.fromDegrees(106.78, 22.92, 107.29, 23.39),
     credit: 'Esri, Maxar, Earthstar Geographics',
   });
+  // v10 真实感增强：每种底图自带色彩参数（ImageryLayer brightness/contrast/
+  // saturation/gamma，运行时可改、切底图时重设）。卫星是主角，用实验胜出值
+  // （sat 1.40/con 1.15/bri 1.02/gam 0.98，见 BUILD-NOTES v10）；地形/街道
+  // 只轻微提色；深灰是灰阶图，饱和度无意义，保持原样。hue 一律 0（不偏色）。
+  const applyLayerColor = (layer, style) => {
+    const c = (style && style.color) || {};
+    layer.brightness = c.brightness ?? 1.0;
+    layer.contrast = c.contrast ?? 1.0;
+    layer.saturation = c.saturation ?? 1.0;
+    layer.gamma = c.gamma ?? 1.0;
+    layer.hue = 0;
+  };
   let imageryLayer = new Cesium.ImageryLayer(makeImageryProvider(BASEMAPS.find((b) => b.id === curBasemap)));
+  applyLayerColor(imageryLayer, BASEMAPS.find((b) => b.id === curBasemap));
   const viewer = new Cesium.Viewer('cesiumContainer', {
     terrainProvider,
     baseLayer: imageryLayer,
@@ -173,6 +186,24 @@ try {
   };
   viewer.camera.moveEnd.addEventListener(clampCamera);
   viewer.scene.globe.depthTestAgainstTerrain = true;
+  // ---- v10 真实感增强：固定下午斜阳（地形光影） ----
+  // 实验结论（两轮 10 组截图对比，见 BUILD-NOTES v10）：
+  // 28° 低太阳角压暗画面（D/E 均暗于无光照 C，否决）；55° 高太阳角 + 强度 1.0
+  // 既出立体感又不压暗（G 胜出）；强度 1.2 + lambert 1.3 则发灰泛白（H/I 否决）。
+  // 用 DirectionalLight 固定光向，不碰时钟——动画用 Date.now()，flyTo 的 tween
+  // 走时钟，固定时钟会冻住飞行；固定光向无此问题。太阳方位西南（225°）、
+  // 高度角 55°（近午后斜阳）。光照只影响地形+影像（globe），白底 pill/路线/
+  // 标注是公告板/折线、不受光。额外显存/瓦片成本为 0，不影响 v4 防刷新。
+  const SUN_ENU = new Cesium.Cartesian3(
+    Math.cos(55 * Math.PI / 180) * Math.SQRT1_2,
+    Math.cos(55 * Math.PI / 180) * Math.SQRT1_2,
+    -Math.sin(55 * Math.PI / 180));
+  const sunFrame = Cesium.Transforms.eastNorthUpToFixedFrame(
+    Cesium.Cartesian3.fromDegrees(CENTER_LON, CENTER_LAT, 0));
+  const sunDir = Cesium.Matrix4.multiplyByPointAsVector(sunFrame, SUN_ENU, new Cesium.Cartesian3());
+  Cesium.Cartesian3.normalize(sunDir, sunDir);
+  viewer.scene.light = new Cesium.DirectionalLight({ direction: sunDir, intensity: 1.0 });
+  viewer.scene.globe.enableLighting = true; // lambertDiffuseMultiplier 保持默认 1.0
   window.__viewer = viewer;
   window.__DATA__ = DATA;
   window.__terrainProvider = terrainProvider;
@@ -1350,6 +1381,7 @@ try {
     if (!style) return;
     if (style.id !== curBasemap) {
       const next = new Cesium.ImageryLayer(makeImageryProvider(style));
+      applyLayerColor(next, style); // 切底图重设色彩（每种风格自带参数）
       viewer.imageryLayers.remove(imageryLayer, true);
       viewer.imageryLayers.add(next);
       imageryLayer = next;
@@ -1361,7 +1393,11 @@ try {
     const note = $('basemapNote');
     if (note) note.textContent = style.note;
     window.__basemap = curBasemap;
-    if (window.__diag) { window.__diag.basemap = curBasemap; window.__diag.imageryMaxLevel = imageryLayer.imageryProvider.maximumLevel; }
+    if (window.__diag) {
+      window.__diag.basemap = curBasemap;
+      window.__diag.imageryMaxLevel = imageryLayer.imageryProvider.maximumLevel;
+      window.__diag.imageryColor = { brightness: imageryLayer.brightness, contrast: imageryLayer.contrast, saturation: imageryLayer.saturation, gamma: imageryLayer.gamma };
+    }
     viewer.scene.requestRender();
   }
   window.__setBasemap = setBasemap;
@@ -1537,6 +1573,10 @@ try {
     maxRequestsPerServer: Cesium.RequestScheduler.maximumRequestsPerServer,
     imageryMaxLevel: viewer.scene.imageryLayers.get(0).imageryProvider.maximumLevel,
     basemap: curBasemap,
+    imageryColor: { brightness: imageryLayer.brightness, contrast: imageryLayer.contrast, saturation: imageryLayer.saturation, gamma: imageryLayer.gamma },
+    lighting: viewer.scene.globe.enableLighting,
+    lightType: viewer.scene.light ? viewer.scene.light.constructor.name : null,
+    lambertDiffuseMultiplier: viewer.scene.globe.lambertDiffuseMultiplier,
     restMsse: REST_MSSE,
     isNarrow,
     imageryRectangle: [106.78, 22.92, 107.29, 23.39],

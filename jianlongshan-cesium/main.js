@@ -1,4 +1,7 @@
-// 剑龙山真实感版 v8：Cesium + 本地 heightmap 地形 + Esri 卫星影像。
+// 剑龙山真实感版 v9：Cesium + 本地 heightmap 地形 + Esri 卫星影像。
+// v9（2026-11-26）：界面换肤——按 Three.js v2.11.8 参考图：白底 pill 标注（红字标高）、
+// 浅蓝虚线路线、顶栏 logo + 附近 pill + 刷新/首页、底部 6 按钮 dock、聊天 FAB 深色圆；
+// 地形/影像/数据一字不动；v8 高清三项（DPR 2.0、影像 17 级、msse 2）保留。
 // 地形是我们的真实 DEM（136×144），高度真实、无竖向夸张；
 // 四峰标签用 KML 高程（用户已定）；农田不画贴片——卫星图上本来就是真农田。
 // v8（2026-11-26）：高清测试版——只提窄屏清晰度：DPR 上限 1.0→2.0、影像 15→17 级、
@@ -174,16 +177,30 @@ try {
   window.__DATA__ = DATA;
   window.__terrainProvider = terrainProvider;
 
-  // ---------- 徒步路线：三段环线（穿四峰），橙色；公路灰色 ----------
+  // ---------- 徒步路线：三段环线（穿四峰），浅蓝底带 + 深蓝虚线；公路灰色 ----------
+  // v9 换肤，颜色按 v2.11.8 图例：底 #9fc3dd、虚线 #2e5a87；
+  // Cesium 地面贴合折线可用 PolylineDashMaterialProperty，gap 透明以露出底带。
   // 4.kml 的三段路线（登山 24 点/1036m、下山 28 点/889m、应急通道 11 点/308m，
   // 两段直连 chord 已含在点列里，环线严格闭合）；山脊支线已删（4.kml 里没有）。
   for (const t of DATA.trails) {
+    const linePos = Cesium.Cartesian3.fromDegreesArray(t.pts.flat());
     viewer.entities.add({
       name: t.name,
       polyline: {
-        positions: Cesium.Cartesian3.fromDegreesArray(t.pts.flat()),
-        clampToGround: true, width: 4,
-        material: Cesium.Color.fromCssColorString('#e0651f'),
+        positions: linePos,
+        clampToGround: true, width: 5,
+        material: Cesium.Color.fromCssColorString('#9fc3dd'),
+      },
+    });
+    viewer.entities.add({
+      name: t.name + '（虚线）',
+      polyline: {
+        positions: linePos,
+        clampToGround: true, width: 2,
+        material: new Cesium.PolylineDashMaterialProperty({
+          color: Cesium.Color.fromCssColorString('#2e5a87'),
+          gapColor: Cesium.Color.TRANSPARENT, dashLength: 16,
+        }),
       },
     });
   }
@@ -208,29 +225,60 @@ try {
   const labelItems = []; // {entity, anchor, tier, main, halfW, halfH, dy}
   const D2R = Cesium.Math.toRadians;
 
+  // ---------- 白底 pill 标注（v9 换肤，样式按 v2.11.8 .marker） ----------
+  // 白底 rgba(255,252,243,.94)、1px 边框、深色字 #263c35、标高红字 #ac4931；
+  // canvas 2 倍绘制（SS=2），显示尺寸 = 画布/2，DPR 2.0 下依然清晰。
+  // 一个 Cesium label 画不出两种颜色的字，所以改用 canvas 公告板（复用补给站 pill 的做法）；
+  // 排叠/透明度/引出线逻辑不变，declutter 里只把 label 换成 billboard。
+  // 几何与 v7 一致：A 档高 26px（halfH 13）、B 档高 22px（halfH 11）。
+  const PILL_STYLE = {
+    peak: { bg: 'rgba(255,252,243,0.94)', border: '#8a9a7a', ink: '#263c35', rust: '#ac4931' },
+    place: { bg: 'rgba(255,252,243,0.94)', border: '#b9bfa9', ink: '#263c35', rust: '#ac4931' },
+    wp: { bg: 'rgba(255,252,243,0.94)', border: '#b9bfa9', ink: '#4a5a50', rust: '#ac4931' },
+    park: { bg: '#dbe7f2', border: '#7ba3c4', ink: '#2f4a66', rust: '#ac4931' },
+  };
+  const makeLabelBoard = (name, heightText, fontPx, kind) => {
+    const st = PILL_STYLE[kind] || PILL_STYLE.wp;
+    const h = fontPx === 13 ? 26 : 22;
+    const padX = 10, gap = 6, SS = 2;
+    const probe = document.createElement('canvas').getContext('2d');
+    probe.font = `bold ${fontPx}px sans-serif`;
+    const nameW = probe.measureText(name).width;
+    const heightW = heightText ? probe.measureText(heightText).width : 0;
+    const w = Math.ceil(padX * 2 + nameW + (heightText ? gap + heightW : 0));
+    const cv = document.createElement('canvas');
+    cv.width = w * SS; cv.height = h * SS;
+    const ctx = cv.getContext('2d');
+    ctx.scale(SS, SS);
+    ctx.beginPath(); ctx.roundRect(0.5, 0.5, w - 1, h - 1, h / 2);
+    ctx.fillStyle = st.bg; ctx.fill();
+    ctx.strokeStyle = st.border; ctx.lineWidth = 1; ctx.stroke();
+    ctx.font = `bold ${fontPx}px sans-serif`;
+    ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = st.ink;
+    ctx.fillText(name, padX, h / 2 + 0.5);
+    if (heightText) { ctx.fillStyle = st.rust; ctx.fillText(heightText, padX + nameW + gap, h / 2 + 0.5); }
+    return { cv, w, h };
+  };
+
   // ---------- 四峰标注：KML 高程做标签，锚点在网格实测高度 +40m ----------
   const peakEntities = [];
   for (const p of DATA.peaks) {
     const pos = Cesium.Cartesian3.fromDegrees(p.lon, p.lat, p.gridH + 40);
+    const board = makeLabelBoard(`${p.num}号峰 ${p.short}`, `${p.kmlH}m`, 13, 'peak');
     const e = viewer.entities.add({
       name: `${p.num}号峰 ${p.short}`,
       position: pos,
       point: { pixelSize: 7, color: Cesium.Color.WHITE, outlineColor: Cesium.Color.BLACK, outlineWidth: 2 },
-      label: {
-        text: `${p.num}号峰 ${p.short} ${p.kmlH}m`,
-        font: 'bold 13px sans-serif',
-        fillColor: Cesium.Color.WHITE,
-        outlineColor: Cesium.Color.BLACK, outlineWidth: 2,
-        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-        showBackground: true, backgroundColor: Cesium.Color.fromCssColorString('rgba(10,20,35,0.78)'),
-        backgroundPadding: new Cesium.Cartesian2(6, 4),
+      billboard: {
+        image: board.cv, width: board.w, height: board.h,
         pixelOffset: new Cesium.Cartesian2(0, -18),
         verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
       },
     });
     e._popup = { title: `${p.num}号峰 ${p.short}`, meta: `${p.kmlH} m`, body: DATA.chatPeaks.find((c) => c.id === p.id)?.text || '', photo: 'peak-' + p.id, fly: { lon: p.lon, lat: p.lat, h: p.gridH + 450, pitch: -35 } };
     peakEntities.push(e);
-    labelItems.push({ entity: e, anchor: pos, tier: 'A', main: false, halfW: 75, halfH: 13, dy: -30, stag: 0 });
+    labelItems.push({ entity: e, anchor: pos, tier: 'A', main: false, halfW: Math.ceil(board.w / 2), halfH: board.h / 2, dy: -30, stag: 0 });
   }
 
   // ---------- 地面高程采样：途点/设施/村子/徒步环线/雨滴，一次批量取 ----------
@@ -317,23 +365,21 @@ try {
   const tierBBoards = []; // B 档公告板（补给站标签、设施图标）：moveEnd 时与 B 档标签同显隐
   let l2StagN = 0;
   const nextStag = () => (l2StagN++ % 2 === 0 ? -10 : 10);
-  const addMarkerEntity = (lon, lat, h, text, font, popup, tier, halfW, stag = 0) => {
+  const addMarkerEntity = (lon, lat, h, text, popup, tier, stag = 0, heightText = null, kind = 'wp') => {
     const pos = Cesium.Cartesian3.fromDegrees(lon, lat, h);
+    const fontPx = tier === 'A' ? 13 : 11;
+    const board = makeLabelBoard(text, heightText, fontPx, kind);
     const e = viewer.entities.add({
       position: pos,
       point: { pixelSize: tier === 'A' ? 7 : 5, color: Cesium.Color.WHITE, outlineColor: Cesium.Color.BLACK, outlineWidth: 2 },
-      label: {
-        text, font,
-        fillColor: Cesium.Color.WHITE, outlineColor: Cesium.Color.BLACK, outlineWidth: 2,
-        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-        showBackground: true, backgroundColor: Cesium.Color.fromCssColorString('rgba(10,20,35,0.78)'),
-        backgroundPadding: new Cesium.Cartesian2(6, 4),
+      billboard: {
+        image: board.cv, width: board.w, height: board.h,
         pixelOffset: new Cesium.Cartesian2(0, -18),
         verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
       },
     });
     if (popup) e._popup = popup;
-    labelItems.push({ entity: e, anchor: pos, tier, main: false, halfW, halfH: tier === 'A' ? 12 : 11, dy: tier === 'A' ? -28 : -26 + stag, stag });
+    labelItems.push({ entity: e, anchor: pos, tier, main: false, halfW: Math.ceil(board.w / 2), halfH: board.h / 2, dy: tier === 'A' ? -28 : -26 + stag, stag });
     return e;
   };
   if (sampledOk) {
@@ -347,11 +393,11 @@ try {
         popup: { title: '园区出口', meta: '应急通道起点 · 海拔约 498 m', body: '水库环线应急通道（下山中间的路）起点旁，下山路线终点附近，村道通往公路；应急出口在东侧下山路线终点。', photo: null, fly: { lon: DATA.park_exit.lon, lat: DATA.park_exit.lat, h: 900, pitch: -55 } } },
       { key: 'emergency', lon: DATA.emergency_exit.lon, lat: DATA.emergency_exit.lat, cart: emgCart, text: '应急出口',
         popup: { title: '应急出口', meta: '', body: '应急出口，下山路线终点（原园区出口处），村道直通公路。', photo: null, fly: { lon: DATA.emergency_exit.lon, lat: DATA.emergency_exit.lat, h: 900, pitch: -55 } } },
-      { key: 'lake', lon: DATA.places[0].lon, lat: DATA.places[0].lat, cart: lakeCart, text: '伏曼水库 497m',
+      { key: 'lake', lon: DATA.places[0].lon, lat: DATA.places[0].lat, cart: lakeCart, text: '伏曼水库', height: '497m',
         popup: { title: '伏曼水库', meta: '湖面海拔约 497 m', body: '伏曼水库，东侧碧绿水库，湖心五岛，湖面海拔约 497 米。', photo: DATA.places[0].photo, fly: { lon: DATA.places[0].lon, lat: DATA.places[0].lat, h: 1200, pitch: -55 } } },
     ];
     for (const m of L1) {
-      addMarkerEntity(m.lon, m.lat, (m.cart.height ?? 600) + 15, m.text, 'bold 13px sans-serif', m.popup, 'A', 70);
+      addMarkerEntity(m.lon, m.lat, (m.cart.height ?? 600) + 15, m.text, m.popup, 'A', 0, m.height || null, 'place');
     }
     // 13 途点：点 + 标签；补给站的标签是画出来的整块 pill（图标贴进标签里，
     // 不是 20 米外的独立标记），所以这两处不用 Cesium 文字标签，只留点位。
@@ -362,7 +408,7 @@ try {
       const h = wpCarts[i].height ?? 600;
       const popup = { title: w.label, meta: '', body: w.text, photo: null, fly: { lon: w.lon, lat: w.lat, h: 900, pitch: -55 } };
       if (w.label === '访客中心') {
-        addMarkerEntity(w.lon, w.lat, h + 8, w.label, 'bold 13px sans-serif', popup, 'A', 70);
+        addMarkerEntity(w.lon, w.lat, h + 8, w.label, popup, 'A', 0, null, 'place');
       } else if (w.fac) {
         const stag = nextStag();
         const pos = Cesium.Cartesian3.fromDegrees(w.lon, w.lat, h + 8);
@@ -373,10 +419,10 @@ try {
         e._popup = popup;
         const label = w.label;
         const cv = makeCanvas(300, 44, (ctx) => {
-          ctx.fillStyle = 'rgba(10,20,35,0.78)';
+          ctx.fillStyle = 'rgba(255,252,243,0.94)'; // v9：补给站 pill 也换白底（v2.11.8 .marker 同款）
           ctx.beginPath(); ctx.roundRect(0, 0, 300, 44, 12); ctx.fill();
-          ctx.strokeStyle = '#000'; ctx.lineWidth = 2; ctx.stroke();
-          ctx.fillStyle = '#fff'; ctx.font = 'bold 22px sans-serif';
+          ctx.strokeStyle = '#b9bfa9'; ctx.lineWidth = 2; ctx.stroke();
+          ctx.fillStyle = '#263c35'; ctx.font = 'bold 22px sans-serif';
           ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
           ctx.fillText(label, 14, 23);
           const tw = ctx.measureText(label).width;
@@ -394,20 +440,20 @@ try {
         tierBBoards.push(board);
         // 补给站的公告板标签不进 declutter（固定在点位正上方，不参与排叠）
       } else {
-        addMarkerEntity(w.lon, w.lat, h + 8, w.label, '11px sans-serif', popup, 'B', 55, nextStag());
+        addMarkerEntity(w.lon, w.lat, h + 8, w.label, popup, 'B', nextStag());
       }
     });
     // 3 停车场
     DATA.parking.forEach((p, i) => {
       const h = parkCarts[i].height ?? 600;
-      addMarkerEntity(p.lon, p.lat, h + 8, '🅿 停车场', '11px sans-serif',
-        { title: `停车场 ${i + 1}`, meta: '景区公路边', body: '停车场，位于景区公路边。', photo: null, fly: { lon: p.lon, lat: p.lat, h: 900, pitch: -55 } }, 'B', 55, nextStag());
+      addMarkerEntity(p.lon, p.lat, h + 8, '🅿 停车场',
+        { title: `停车场 ${i + 1}`, meta: '景区公路边', body: '停车场，位于景区公路边。', photo: null, fly: { lon: p.lon, lat: p.lat, h: 900, pitch: -55 } }, 'B', nextStag(), null, 'park');
     });
     // 6 村子：点位 + “村庄”标注（v2.10.11 里村子没有名字，只有屋群落点；
     // 卫星图上本来就有真实屋顶，这里只落点位+标注，不另建 3D 房子、不编文案）
     DATA.villages.forEach((v, i) => {
       const h = vilCarts[i].height ?? 600;
-      addMarkerEntity(v.lon, v.lat, h + 8, '村庄', '11px sans-serif', null, 'B', 40, nextStag());
+      addMarkerEntity(v.lon, v.lat, h + 8, '村庄', null, 'B', nextStag());
     });
     // 3 设施：图标公告板（医疗红十字 / WC 徽），不带文字
     const facBoards = viewer.scene.primitives.add(new Cesium.BillboardCollection());
@@ -582,7 +628,7 @@ try {
   $('cesiumContainer').appendChild(leaderSvg);
   const leaderPool = []; // 复用 <line>，免得每帧重建 DOM
   window.__leaderLines = [];
-  // 坑：e.label.show 是 Property 对象，恒为真值——不能用 !e.label.show
+  // 坑：e.billboard.show 是 Property 对象，恒为真值——不能用 !e.billboard.show
   // 判断，必须用本地布尔值 shown，否则出界标签会混进排叠、把别的标签全挤掉。
   const MIN_GAP = 28;
   let labelsEnabled = false; // 初始视角是全景，总览不显示标签
@@ -599,8 +645,8 @@ try {
     const distOp = h >= 1500 ? 0.6 : h <= 1150 ? 1.0 : 0.6 + 0.4 * (1500 - h) / 350;
     const leaderData = []; // 本轮的引出线：{x1,y1,x2,y2,op}，pill 底边中心 → 自己的锚点
     const cw = viewer.scene.canvas.clientWidth, ch = viewer.scene.canvas.clientHeight;
-    const viewsTop = $('views').getBoundingClientRect().top;
-    const titleRect = $('title').getBoundingClientRect();
+    const viewsTop = $('dock').getBoundingClientRect().top;
+    const titleRect = $('topbar').getBoundingClientRect();
     // pill 中心纵向安全带：顶缘留 30px，底缘在按钮栏之上
     const safeTop = 30, safeBottom = Math.max(safeTop, viewsTop - 13 - 2);
     const items = [];
@@ -613,14 +659,13 @@ try {
       //     再低 pill 就要压按钮栏——主峰也一样，排叠会把它夹紧到带内
       const inView = s && s.x > 20 && s.x < cw - 20 && s.y > 15 && s.y < safeBottom + 30;
       const shown = showTier && inView;
-      it.entity.label.show = shown;
+      it.entity.billboard.show = shown;
       if (!shown) continue;
       // 距离透明度：B 档按 distOp 渐变，A 档恒 1.0（每轮重设，高度变化后跟上）
       const op = it.tier === 'A' ? 1 : distOp;
-      const L = it.entity.label;
-      L.fillColor = Cesium.Color.WHITE.withAlpha(op);
-      L.outlineColor = Cesium.Color.BLACK.withAlpha(op);
-      L.backgroundColor = Cesium.Color.fromCssColorString(`rgba(10,20,35,${(0.78 * op).toFixed(3)})`);
+      // 白底 pill 是整张 canvas 纹理：透明度用 billboard.color 整体乘
+      // （白底 × 白色带 alpha = 渐隐；v9 前是分开设 label 的 fill/outline/background）
+      it.entity.billboard.color = Cesium.Color.WHITE.withAlpha(op);
       items.push({ ...it, x: s.x, y: s.y, main: it.entity === currentMainPeak });
     }
     // B 档公告板（补给站标签、设施图标）：与 B 档标签同显隐（只判高度+视口，不排叠）
@@ -656,7 +701,7 @@ try {
     };
     const placeOne = (it, target) => {
       const ox = computeOx(it, target);
-      it.entity.label.pixelOffset = new Cesium.Cartesian2(ox, target - it.y + it.halfH);
+      it.entity.billboard.pixelOffset = new Cesium.Cartesian2(ox, target - it.y + it.halfH);
       window.__labelBoxes.push({
         name: it.entity.name || it.entity._popup?.title || '',
         x: Math.round(it.x + ox - it.halfW), y: Math.round(target - it.halfH),
@@ -700,10 +745,10 @@ try {
           target = titleRect.bottom + it.halfH + 2;
         }
         if (target < safeTop) target = safeTop;
-        if (target > safeBottom) { it.entity.label.show = false; continue; }
+        if (target > safeBottom) { it.entity.billboard.show = false; continue; }
         // 往下排时 pill 底缘不得压住自己的锚点圆点：排不下就隐藏，不硬盖
         // （B 档 +10 的 pill 自然底缘离锚点只有 5px，阈值放宽到 3px 才留得住）
-        if (target + it.halfH > it.y - (it.tier === 'B' ? 3 : 6)) { it.entity.label.show = false; continue; }
+        if (target + it.halfH > it.y - (it.tier === 'B' ? 3 : 6)) { it.entity.billboard.show = false; continue; }
         prev = placeOne(it, target);
       }
     } else {
@@ -715,7 +760,7 @@ try {
         if (hitsTitle(target, it.x, computeOx(it, target), it.halfW, it.halfH)) {
           target = titleRect.bottom + it.halfH + 2;
         }
-        if (target > prevAbove - MIN_GAP || target < safeTop) { it.entity.label.show = false; continue; }
+        if (target > prevAbove - MIN_GAP || target < safeTop) { it.entity.billboard.show = false; continue; }
         prevAbove = placeOne(it, target);
       }
       // 下方组：离主峰近的先排，向下依次排开
@@ -726,12 +771,12 @@ try {
         if (hitsTitle(target, it.x, computeOx(it, target), it.halfW, it.halfH)) {
           target = titleRect.bottom + it.halfH + 2;
         }
-        if (target > safeBottom) { it.entity.label.show = false; continue; }
+        if (target > safeBottom) { it.entity.billboard.show = false; continue; }
         if (target < prevBelow + MIN_GAP) target = prevBelow + MIN_GAP;
-        if (target > safeBottom) { it.entity.label.show = false; continue; }
+        if (target > safeBottom) { it.entity.billboard.show = false; continue; }
         // 往下排时 pill 底缘不得压住自己的锚点圆点：排不下就隐藏，不硬盖
         // （B 档 +10 的 pill 自然底缘离锚点只有 5px，阈值放宽到 3px 才留得住）
-        if (target + it.halfH > it.y - (it.tier === 'B' ? 3 : 6)) { it.entity.label.show = false; continue; }
+        if (target + it.halfH > it.y - (it.tier === 'B' ? 3 : 6)) { it.entity.billboard.show = false; continue; }
         prevBelow = placeOne(it, target);
       }
     }
@@ -899,47 +944,41 @@ try {
     { name: '出口', labels: true, run: () => fly(107.040969, 23.156357 - 0.004, (parkExitCart.height ?? 498) + 450, -35) },
     { name: '伏曼水库', labels: false, run: () => fly(DATA.lake.center[0], DATA.lake.center[1] - 0.0035, 1700, -55) },
   ];
-  const viewsEl = $('views');
+  // v9 换肤：9 个视角预设收进「视角」面板（#viewChips 的 chip 按钮），
+  // 底栏改成 dock（四季/场景/视角/图例/笔记/景区，静态 HTML，见 index.html）。
+  const viewChipsEl = $('viewChips');
+  let currentViewName = '全景'; // 刷新按钮用：回当前视角的初始状态
+  const applyViewByName = (name) => {
+    const v = views.find((x) => x.name === name);
+    if (!v) return false;
+    viewChipsEl.querySelectorAll('button[data-view]').forEach((x) => x.classList.remove('on'));
+    const b = [...viewChipsEl.querySelectorAll('button[data-view]')].find((x) => x.textContent === name);
+    if (b) b.classList.add('on');
+    window.__view = v.name;
+    currentViewName = v.name;
+    labelsEnabled = v.labels !== false;
+    currentMainPeak = v.peak || null;
+    stopDragGlide(); // 预设飞行前停掉手动拖动的滑行，免得滑行和飞行打架
+    v.run();
+    setTimeout(declutterLabels, 1900); // 飞行 1.6s 落定后再排标签（moveEnd 也会触发一次）
+    return true;
+  };
   views.forEach((v, i) => {
     const b = document.createElement('button');
-    b.textContent = v.name;
+    b.className = 'chip';
     b.dataset.view = v.name;
-    b.onclick = () => {
-      viewsEl.querySelectorAll('button[data-view]').forEach((x) => x.classList.remove('active'));
-      b.classList.add('active');
-      window.__view = v.name;
-      labelsEnabled = v.labels !== false;
-      currentMainPeak = v.peak || null;
-      stopDragGlide(); // 预设飞行前停掉手动拖动的滑行，免得滑行和飞行打架
-      v.run();
-      b.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
-      setTimeout(declutterLabels, 1900); // 飞行 1.6s 落定后再排标签（moveEnd 也会触发一次）
-    };
-    viewsEl.appendChild(b);
-    if (i === 0) b.classList.add('active');
+    b.innerHTML = `<span class="t">${v.name}</span>`;
+    b.onclick = () => applyViewByName(v.name);
+    viewChipsEl.appendChild(b);
+    if (i === 0) b.classList.add('on');
   });
-  // 底部按钮栏后半段：功能按钮（与视角按钮同一行横向滚动）
-  const funcSep = document.createElement('span');
-  funcSep.className = 'sep';
-  viewsEl.appendChild(funcSep);
-  const funcBtns = [
-    { label: '🍂 四季', sheet: 'seasons' },
-    { label: '🗺 图例', sheet: 'legend' },
-    { label: 'ⓘ 景区介绍', sheet: 'info' },
-    { label: '🗺️ 底图', sheet: 'basemap' },
-  ];
-  for (const f of funcBtns) {
-    const b = document.createElement('button');
-    b.textContent = f.label;
-    b.className = 'func';
-    b.onclick = () => openSheet(f.sheet);
-    viewsEl.appendChild(b);
-  }
   window.__views = views.map((v) => v.name);
-  window.__applyView = (name) => {
-    const b = [...viewsEl.querySelectorAll('button[data-view]')].find((x) => x.textContent === name);
-    if (b) b.click();
-  };
+  window.__applyView = (name) => applyViewByName(name);
+  // 顶栏刷新（回当前视角初始状态）/ 首页（回全景 + 停定位；v2.11.8 里 ⌂ 是回全景）
+  $('refreshBtn').addEventListener('click', () => {
+    if (!applyViewByName(currentViewName)) applyViewByName('全景');
+  });
+  $('homeBtn').addEventListener('click', () => { stopLocate(); applyViewByName('全景'); });
 
   // ---------- 浮层：一次只开一个（sheet / 聊天 / 弹窗互斥） ----------
   let photosCache = null;
@@ -952,7 +991,7 @@ try {
   }
   function closeSheets() {
     document.querySelectorAll('.sheet').forEach((s) => { s.hidden = true; });
-    document.querySelectorAll('#views button.func').forEach((b) => b.classList.remove('on'));
+    document.querySelectorAll('#dock button[data-sheet]').forEach((b) => b.classList.remove('on'));
     $('nearbyBtn')?.classList.remove('on');
   }
   function closeChat() { $('chatPanel').hidden = true; }
@@ -965,7 +1004,7 @@ try {
     closeAllOverlays();
     if (wasHidden) {
       sh.hidden = false;
-      const btn = [...document.querySelectorAll('#views button.func')].find((b) => b.textContent.includes({ seasons: '四季', legend: '图例', info: '景区介绍', nearby: '附近', basemap: '底图' }[id] || ''));
+      const btn = document.querySelector(`#dock button[data-sheet="${id}"]`);
       if (btn) btn.classList.add('on');
       if (id === 'nearby') { nearbyRender(); $('nearbyBtn')?.classList.add('on'); }
     }
@@ -973,6 +1012,8 @@ try {
   }
   window.__openSheet = openSheet;
   document.querySelectorAll('.sheet [data-close]').forEach((b) => b.addEventListener('click', closeSheets));
+  // v9 dock：6 个按钮（四季/场景/视角/图例/笔记/景区）——场景 = 底图切换（见 BUILD-NOTES 对应表）
+  document.querySelectorAll('#dock button[data-sheet]').forEach((b) => b.addEventListener('click', () => openSheet(b.dataset.sheet)));
   $('detailX').addEventListener('click', closeDetail);
   $('nearbyBtn').addEventListener('click', () => openSheet('nearby'));
 
@@ -1460,8 +1501,8 @@ try {
       if (best && restoredView.h <= 2000) currentMainPeak = best;
       // 按钮高亮跟上恢复的视角（默认亮全景；恢复到峰/水库预设就亮该项；
       // 自由拖动的视角不匹配任何预设，就全都不亮）
-      const viewBtns = [...document.querySelectorAll('#views button[data-view]')];
-      viewBtns.forEach((x) => x.classList.remove('active'));
+      const viewBtns = [...document.querySelectorAll('#viewChips button[data-view]')];
+      viewBtns.forEach((x) => x.classList.remove('on'));
       let activeName = null;
       if (best && bestIdx >= 0 && restoredView.h <= 2000) activeName = `${DATA.peaks[bestIdx].num}号峰 ${DATA.peaks[bestIdx].short}`;
       else if (Math.abs(restoredView.lon - 107.0365) < 0.001 && Math.abs(restoredView.lat - 23.1445) < 0.001 && Math.abs(restoredView.h - 3000) < 50) activeName = '全景';
@@ -1469,7 +1510,7 @@ try {
       else if (Math.abs(restoredView.lon - 107.041) < 0.001 && Math.abs(restoredView.lat - (23.1581 - 0.004)) < 0.001 && Math.abs(restoredView.h - ((entCart.height ?? 488) + 450)) < 150) activeName = '入口';
       else if (Math.abs(restoredView.lon - 107.040969) < 0.001 && Math.abs(restoredView.lat - (23.156357 - 0.004)) < 0.001 && Math.abs(restoredView.h - ((parkExitCart.height ?? 498) + 450)) < 150) activeName = '出口';
       else if (Math.abs(restoredView.lon - DATA.lake.center[0]) < 0.001 && Math.abs(restoredView.lat - (DATA.lake.center[1] - 0.0035)) < 0.001 && Math.abs(restoredView.h - 1700) < 50) activeName = '伏曼水库';
-      if (activeName) { const ab = viewBtns.find((x) => x.textContent === activeName); if (ab) ab.classList.add('active'); }
+      if (activeName) { const ab = viewBtns.find((x) => x.textContent === activeName); if (ab) ab.classList.add('on'); }
       window.__view = '已恢复';
       log('视角已恢复：' + JSON.stringify(restoredView));
     }

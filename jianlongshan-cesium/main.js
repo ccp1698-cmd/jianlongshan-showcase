@@ -13,6 +13,9 @@ const log = (t) => console.log('[cesium-jls] ' + t);
 window.__ready = false;
 window.__error = null;
 
+// 窄屏（手机 ≤760px）才做减负：电脑端一律不动
+const isNarrow = window.innerWidth <= 760;
+
 // ---------- 地形瓦片是 base64 文本（GitHub 连接器只接受 UTF-8 文本上传） ----------
 // 瓦片字节一字不动：取数时把 .terrain.b64 文本解码回 ArrayBuffer 再交给
 // Cesium 自身解码，四峰精度与之前验证的 ≤0.4m 完全一致。
@@ -60,9 +63,12 @@ try {
 
   // 注意：1.147 的 Viewer 已没有 imageryProvider 选项（静默忽略），
   // 影像要走 baseLayer: new Cesium.ImageryLayer(provider)。
+  // ArcGIS API key：公开应用 key，随页面代码下发（靠来源网址 Referrer 限制保护，
+  // 不靠保密）。只放这一处；不要抄到报告、日志或 BUILD-NOTES 里。
+  const ARCGIS_API_KEY = 'AAPTa3ElsJROTHE12I328JVC1Wg..9c7pYJs-60w4T61Mq5pLtKb5fTO1Gm2XsgUXiLmIfDDjk_ObQQjqo7dBjmST0Y9HFTE-8eBGWLqSTR1gUJq5Q8JYd0hzudDv216YhlbRLesURM6a_7BayGrrPFyiNkEhLGI-XQxNdDshn_9CpPEiNq4-qFXwFh_iK4Mq5gGDqyeFycgmqyZ1EYjxwp2Wpmvv8YxFyU2pSsXqAi5KaKNEsVv13OtsceOHSKfvM9rzhAT5jMoyMjzu0-k.AT1_JCyw5th4';
   const imageryLayer = new Cesium.ImageryLayer(new Cesium.UrlTemplateImageryProvider({
-    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-    maximumLevel: 18,
+    url: 'https://ibasemaps-api.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}?token=' + ARCGIS_API_KEY,
+    maximumLevel: isNarrow ? 15 : 18, // 窄屏少拉高倍瓦片，省显存和流量；宽屏仍 18
     // 影像只拉 20km 范围矩形（覆盖地形外层框 + 余量），别全 globe 拉瓦片
     rectangle: Cesium.Rectangle.fromDegrees(106.78, 22.92, 107.29, 23.39),
     credit: 'Esri, Maxar, Earthstar Geographics',
@@ -78,7 +84,7 @@ try {
   // ---- 流畅度（拖动卡）：手机降分辨率 + 拖动时降地形细节 ----
   // 窄屏（手机）DPR 上限 1.0（原来 1.5），渲染像素数降约 55%，是拖动卡顿的最大头；
   // 宽屏仍 1.5。本地 SwiftShader 帧率不代表手机，只看瓦片数/分辨率等可量化指标。
-  const dprCap = window.innerWidth <= 760 ? 1.0 : 1.5;
+  const dprCap = isNarrow ? 1.0 : 1.5;
   viewer.resolutionScale = Math.min(window.devicePixelRatio || 1, dprCap);
   // 雾：v2 起按四季开（见 applySeason）。上一轮关雾是把它当成每帧后处理；
   // 实测 Cesium 的雾只是地形片元着色器里的一项（density²×距离² 的指数雾），
@@ -86,8 +92,14 @@ try {
   // 大气散射仍关（每帧算，贵；预设视角俯角大，天空基本不出画）。
   viewer.scene.fog.enabled = true;
   viewer.scene.skyAtmosphere.show = false; // 大气散射每帧算，关掉；天空用底色（见 index.html 背景）
-  viewer.scene.globe.maximumScreenSpaceError = 2;
-  // 拖动时放宽到 4：瓦片细节降一档，拖动中少拉/少解码瓦片；停稳恢复 2
+  // 窄屏静止时 msse 3（宽屏仍 2）：少拉一档瓦片；拖动时仍 4
+  const REST_MSSE = isNarrow ? 3 : 2;
+  viewer.scene.globe.maximumScreenSpaceError = REST_MSSE;
+  // 窄屏地形瓦片缓存 50（默认 100），省显存；宽屏不动
+  if (isNarrow) viewer.scene.globe.tileCacheSize = 50;
+  // 窄屏每服务器并发 3（默认 6），削平加载尖峰；宽屏不动
+  Cesium.RequestScheduler.maximumRequestsPerServer = isNarrow ? 3 : 6;
+  // 拖动时放宽到 4：瓦片细节降一档，拖动中少拉/少解码瓦片；停稳恢复 REST_MSSE
   viewer.camera.moveStart.addEventListener(() => {
     viewer.scene.globe.maximumScreenSpaceError = 4;
   });
@@ -282,6 +294,7 @@ try {
     const spruceInst = [], trunkInst = [], crownInst = [];
     const m4 = new Cesium.Matrix4();
     DATA.trees.forEach((t, i) => {
+      if (isNarrow && i % 2 === 1) return; // 窄屏树减半：隔一取一，分布不变，仍实例化批量画
       const h = treeCarts[i].height;
       if (h === undefined) return;
       const sc = t[3];
@@ -575,7 +588,9 @@ try {
   // 水平 ±434m 往复，速度 9.8–14.1m/s。
   const cloudEnts = [];
   if (sampledOk) {
-    for (const c of DATA.clouds) {
+    for (let ci = 0; ci < DATA.clouds.length; ci++) {
+      const c = DATA.clouds[ci];
+      if (isNarrow && ci % 2 === 1) continue; // 窄屏云减半（3 朵），效果保留
       const puffs = c.puffs.map((pf) => viewer.entities.add({
         position: Cesium.Cartesian3.fromDegrees(c.lon + pf.dLon, c.lat + pf.dLat, c.h + pf.dH),
         ellipsoid: {
@@ -786,13 +801,14 @@ try {
     labelBoxes: window.__labelBoxes.length,
   });
   viewer.camera.moveEnd.addEventListener(() => {
-    viewer.scene.globe.maximumScreenSpaceError = 2; // 停稳恢复全细节
+    viewer.scene.globe.maximumScreenSpaceError = REST_MSSE; // 停稳恢复全细节
     declutterLabels(); setTimeout(declutterLabels, 300);
+    saveView(); // 窄屏才存（saveView 内部 gate，电脑端不写）
   });
   window.addEventListener('resize', () => {
     setTimeout(declutterLabels, 100);
     // 尺寸变化也会触发 moveStart（msse 升到 4）却不一定有 moveEnd——这里兜底恢复 2
-    setTimeout(() => { viewer.scene.globe.maximumScreenSpaceError = 2; }, 200);
+    setTimeout(() => { viewer.scene.globe.maximumScreenSpaceError = REST_MSSE; }, 200);
   });
 
   // ---------- 视角预设 ----------
@@ -1288,12 +1304,83 @@ try {
     viewer.scene.requestRender();
   }
 
+  // ---------- 视角记忆（窄屏防重载后回到开头） ----------
+  // iOS 内存压力杀掉网页进程会整页重载；moveEnd 后节流保存相机，
+  // 加载时恢复到上次视角。只在窄屏启用：电脑端行为一律不动
+  // （不写 localStorage、不恢复；冒烟测试是静态检查也不受影响）。
+  const VIEW_KEY = 'jls-cesium-view-v1';
+  let lastSaveAt = 0;
+  const readSavedView = () => {
+    try {
+      const v = JSON.parse(localStorage.getItem(VIEW_KEY) || 'null');
+      if (!v || !isFinite(v.lon) || !isFinite(v.lat) || !isFinite(v.h)) return null;
+      const distM = Math.hypot((v.lon - CENTER_LON) * 102000, (v.lat - CENTER_LAT) * 111000);
+      if (!(v.h >= 100 && v.h <= 12000 && distM <= 18000)) return null;
+      return v;
+    } catch (e) { return null; }
+  };
+  function saveView() {
+    if (!isNarrow) return;
+    const now = Date.now();
+    if (now - lastSaveAt < 2000) return; // 节流：最多 2 秒存一次
+    lastSaveAt = now;
+    try {
+      const cart = viewer.camera.positionCartographic;
+      if (!cart) return;
+      localStorage.setItem(VIEW_KEY, JSON.stringify({
+        lon: +Cesium.Math.toDegrees(cart.longitude).toFixed(6),
+        lat: +Cesium.Math.toDegrees(cart.latitude).toFixed(6),
+        h: Math.round(cart.height),
+        heading: +viewer.camera.heading.toFixed(4),
+        pitch: +viewer.camera.pitch.toFixed(4),
+        t: now,
+      }));
+    } catch (e) { /* 隐私模式等写失败就跳过 */ }
+  }
+
   // 初始视角：全景（瞬时，不用 fly 动画）
   viewer.camera.setView({
     destination: Cesium.Cartesian3.fromDegrees(107.0365, 23.1445, 3000),
     orientation: { heading: 0, pitch: D2R(-55), roll: 0 },
   });
   window.__view = '全景';
+  // 窄屏重载恢复：有保存视角且在夹取范围内，回到该视角（不用预设值）；
+  // 点任何视角预设后按预设走（预设只在加载后触发，不受保存值干扰，
+  // 且 moveEnd 会把预设视角存下来，下次重载就回到该预设视角）。
+  let restoredView = null;
+  if (isNarrow) {
+    restoredView = readSavedView();
+    if (restoredView) {
+      viewer.camera.setView({
+        destination: Cesium.Cartesian3.fromDegrees(restoredView.lon, restoredView.lat, restoredView.h),
+        orientation: { heading: restoredView.heading || 0, pitch: restoredView.pitch ?? D2R(-55), roll: 0 },
+      });
+      // 恢复到特写高度时打开标签（与峰预设一致）；全景高度下 declutter 本来就不显示
+      labelsEnabled = restoredView.h <= 2000;
+      // 落点靠近某峰预设时按该峰特写处理（主峰标签优先）：
+      // 与预设相机位置比（p.lon, p.lat-0.004），不要直接比峰位——
+      // 相机在峰南 0.004°，直接比峰位会错认南边的邻峰。
+      let best = null, bestIdx = -1, bestD = 0.002;
+      DATA.peaks.forEach((p, j) => {
+        const d = Math.hypot(p.lon - restoredView.lon, (p.lat - 0.004) - restoredView.lat);
+        if (d < bestD && Math.abs(restoredView.h - (p.gridH + 450)) < 150) { bestD = d; best = peakEntities[j]; bestIdx = j; }
+      });
+      if (best && restoredView.h <= 2000) currentMainPeak = best;
+      // 按钮高亮跟上恢复的视角（默认亮全景；恢复到峰/水库预设就亮该项；
+      // 自由拖动的视角不匹配任何预设，就全都不亮）
+      const viewBtns = [...document.querySelectorAll('#views button[data-view]')];
+      viewBtns.forEach((x) => x.classList.remove('active'));
+      let activeName = null;
+      if (best && bestIdx >= 0 && restoredView.h <= 2000) activeName = `${DATA.peaks[bestIdx].num}号峰 ${DATA.peaks[bestIdx].short}`;
+      else if (Math.abs(restoredView.lon - 107.0365) < 0.001 && Math.abs(restoredView.lat - 23.1445) < 0.001 && Math.abs(restoredView.h - 3000) < 50) activeName = '全景';
+      else if (Math.abs(restoredView.lon - DATA.lake.center[0]) < 0.001 && Math.abs(restoredView.lat - (DATA.lake.center[1] - 0.0035)) < 0.001 && Math.abs(restoredView.h - 1700) < 50) activeName = '伏曼水库';
+      if (activeName) { const ab = viewBtns.find((x) => x.textContent === activeName); if (ab) ab.classList.add('active'); }
+      window.__view = '已恢复';
+      log('视角已恢复：' + JSON.stringify(restoredView));
+    }
+  }
+  window.__restoredView = restoredView;
+  window.__viewMemory = { key: VIEW_KEY, save: saveView, read: readSavedView };
   applySeason('spring'); // 建树 + 雾密度（默认春）
   declutterLabels();
   setInterval(tick, 66);
@@ -1311,6 +1398,11 @@ try {
     fogDensity: viewer.scene.fog.density,
     skyAtmosphere: viewer.scene.skyAtmosphere.show,
     maxZoomDistance: viewer.scene.screenSpaceCameraController.maximumZoomDistance,
+    tileCacheSize: viewer.scene.globe.tileCacheSize,
+    maxRequestsPerServer: Cesium.RequestScheduler.maximumRequestsPerServer,
+    imageryMaxLevel: viewer.scene.imageryLayers.get(0).imageryProvider.maximumLevel,
+    restMsse: REST_MSSE,
+    isNarrow,
     imageryRectangle: [106.78, 22.92, 107.29, 23.39],
     peaks: DATA.peaks.map((p) => ({ short: p.short, kmlH: p.kmlH, gridH: p.gridH })),
     ground: groundStats,

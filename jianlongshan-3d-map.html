@@ -221,7 +221,7 @@ a{color:#9fc6a8;text-underline-offset:2px}
     <b>四季</b> —— 崇左属亚热带湿润季风区，年均 21–22℃，无霜期 330 天以上，年雨量约 1200 mm，雨季 4–9 月占全年近八成，春季多干旱：这里是“长夏无冬、四季常青”，所以不用温带春夏秋冬。<a href="https://www.weather.com.cn/cityintro/101300201.shtml" target="_blank" rel="noopener">中国天气网 · 崇左城市介绍 ↗</a><br>
   </div>
   <div class="foot">
-    地形：SRTM / Terrarium DEM · 山路：© OpenStreetMap contributors (ODbL) · 画风与结构：Pocket City Skill（April Zhu，MIT）· 树木放大 ×4 以便看清 · 山脊最高 730 m（天柱峰）· 微缩模型 v2.11.0 · <span>3D 模型：Polyfork（CC BY 4.0）</span> <button id="attrToggle" type="button">查看完整署名</button>
+    地形：SRTM / Terrarium DEM · 山路：© OpenStreetMap contributors (ODbL) · 画风与结构：Pocket City Skill（April Zhu，MIT）· 树木放大 ×4 以便看清 · 山脊最高 730 m（天柱峰）· 微缩模型 v2.11.1 · <span>3D 模型：Polyfork（CC BY 4.0）</span> <button id="attrToggle" type="button">查看完整署名</button>
     <div id="attrFull" hidden>3D 模型（CC BY 4.0）：Rammed-Earth Farmhouse by Polyfork (https://polyfork.dev/asset/rammed-earth-farmhouse-6432fc), CC BY 4.0；Gabled Farmhouse by Polyfork (https://polyfork.dev/asset/gabled-farmhouse-c7534f), CC BY 4.0；Thatched Cottage by Polyfork (https://polyfork.dev/asset/thatched-cottage-0e63f5), CC BY 4.0；Log Cabin by Polyfork (https://polyfork.dev/asset/log-cabin-4fac3b), CC BY 4.0；Timber Barn by Polyfork (https://polyfork.dev/asset/timber-barn-90b3ce), CC BY 4.0；Market Stall by Polyfork (https://polyfork.dev/asset/market-stall-9d0b29), CC BY 4.0；Town Car by Polyfork (https://polyfork.dev/asset/town-car-56eeb6), CC BY 4.0；Scout Jeep by Polyfork (https://polyfork.dev/asset/scout-jeep-c02efe), CC BY 4.0；Family Minivan by Polyfork (https://polyfork.dev/asset/family-minivan-924de0), CC BY 4.0；Horse by Polyfork (https://polyfork.dev/asset/horse-base), CC BY 4.0；Cow by Polyfork (https://polyfork.dev/asset/cow-base), CC BY 4.0；Sheep by Polyfork (https://polyfork.dev/asset/sheep-base), CC BY 4.0；Red Fox by Polyfork (https://polyfork.dev/asset/red-fox-5c3bc0), CC BY 4.0；Wooden Rowboat by Polyfork (https://polyfork.dev/asset/wooden-rowboat-916981), CC BY 4.0；Dock Platform Section by Polyfork (https://polyfork.dev/asset/dock-platform-section-b36e7c), CC BY 4.0；Trail Signpost by Polyfork (https://polyfork.dev/asset/trail-signpost-bd29a7), CC BY 4.0</div>
   </div>
 </div>
@@ -1302,7 +1302,10 @@ function addMarker(lon,lat,yOff,html,cls,onClick,off){
   // (waypoints, parking, facilities) hides past size 34 (L3 used to hide
   // past 30); the panorama (size 35) still hides them all.
   const _hidTier=cls.indexOf('lv2')>=0?camState.size>34:false;
-  el.style.opacity=_hidTier?'0':'1'; el.style.pointerEvents=_hidTier?'none':'auto';
+  // v2.11.1: the initial opacity is the distance factor when visible
+  // (distOpacity is a hoisted function declaration, so it is callable
+  // here even though it is defined below with fadeMarker).
+  el.style.opacity=_hidTier?'0':String(distOpacity()); el.style.pointerEvents=_hidTier?'none':'auto';
   // v2.10: vertical stagger CANCELLED (user: "取消垂直错开") — the v2.9.9
   // off.stag fixed-pixel offsets and the 1 px leader lines are gone; every
   // label anchors directly above its point again (yOff lift only, dx/dy 0).
@@ -1324,7 +1327,10 @@ function addMarker(lon,lat,yOff,html,cls,onClick,off){
     // the classes never change after creation, so read them once here.
     // v2.10.14: one flag only — isL2 (class 'lv2'); L3 is gone (merged
     // into L2), L1 is "not L2".
-    isL2:cls.indexOf('lv2')>=0});
+    // v2.11.1: _vis mirrors the tier/occlusion decision (set by
+    // fadeMarker, initialised here) — the per-frame loop in
+    // updateMarkers reads it to retarget the distance opacity.
+    isL2:cls.indexOf('lv2')>=0,_vis:!_hidTier});
   return el;
 }
 const flags=[]; // v2.9.9: waving summit flags {mesh, base positions, phase}
@@ -1989,11 +1995,31 @@ const v3=new THREE.Vector3();
 // the snapshot and re-enables the update. Epsilon 1e-4 world units is
 // ~0.003 px on screen — far below the 0.05 px anchor tolerance.
 let _mkSnap=null;
+// v2.11.1: distance fade — a label's opacity follows the camera
+// distance (camState.size), on top of the tier/occlusion fade below.
+// Far (panorama, size 35) the labels are at their most transparent
+// (0.6 — clearly faded but still readable); near (size <= 12) they are
+// fully opaque (1.0); in between it interpolates linearly, so a manual
+// pinch-zoom fades the labels gradually as the distance changes.
+// The factor is a pure function of size (no per-marker state), so it
+// composes with the tier fade by multiplication: visible = dist, hidden
+// = 0. It never changes pointer-events (opacity alone never blocks a tap).
+function distOpacity(){
+  const s=camState.size;
+  if(s<=12)return 1;
+  if(s>=35)return 0.6;
+  return 1-0.4*(s-12)/23;
+}
 // v2.10.6: fade a marker in/out — opacity + hit-testing only; the CSS
 // .marker transition (opacity .18s) animates it. display stays block so
 // the fade has something to animate (display:none would cut it dead).
+// v2.11.1: the opacity target is the distance factor when visible, 0
+// when hidden; m._vis records the tier/occlusion decision so the
+// per-frame loop in updateMarkers can retarget the distance opacity
+// every frame (even mid-pinch — see below).
 function fadeMarker(m,show){
-  if(show){m.el.style.opacity='1';m.el.style.pointerEvents='auto';}
+  m._vis=show;
+  if(show){m.el.style.opacity=String(distOpacity());m.el.style.pointerEvents='auto';}
   else{m.el.style.opacity='0';m.el.style.pointerEvents='none';}
 }
 // v2.10.6: terrain-occlusion state, refreshed throttled (see
@@ -2079,6 +2105,16 @@ function updateMarkers(){
     // of flickering while zooming — while its transform keeps tracking.
     const hidden=(m.isL2&&camState.size>34)||m.occ;
     if(!pinching)fadeMarker(m,!hidden);
+    // v2.11.1: retarget the distance opacity EVERY frame, even mid-pinch.
+    // The tier/occlusion DECISION above stays frozen during a pinch
+    // (v2.10.7 — a label crossing the size-34 threshold mid-pinch waits
+    // for the gesture to end before fading in/out), but the distance
+    // factor is continuous in size, so it follows the zoom smoothly
+    // instead of jumping at release — that is the "拉近逐渐变不透明"
+    // the user asked for. Writing the target every frame just retargets
+    // the CSS .18s transition (same as the tier fade always did); a
+    // hidden marker (m._vis false) keeps opacity 0 and is never written.
+    if(m._vis)m.el.style.opacity=String(distOpacity());
     // v2.9.4: peak labels anchor to the FLAG TOP (m.top), not the summit — the
     // label's bottom edge sits a fixed 13 px above the projected flag top, so it
     // stays glued above its own red flag at every zoom and elevation. (The old

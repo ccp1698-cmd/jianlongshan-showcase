@@ -1,6 +1,9 @@
-// 剑龙山真实感版 v1：Cesium + 本地 heightmap 地形 + Esri 卫星影像。
+// 剑龙山真实感版 v2：Cesium + 本地 heightmap 地形 + Esri 卫星影像。
 // 地形是我们的真实 DEM（136×144），高度真实、无竖向夸张；
 // 四峰标签用 KML 高程（用户已定）；农田不画贴片——卫星图上本来就是真农田。
+// v2（2026-11-26）：范围缩到 20km + 第二阶段全部功能（按 v2.10.11 搬过来：
+// 定位、景区小助理、672 棵树、6 村子、3 停车场、3 设施、补给站标签、13 途点、
+// 40 徒步者、四季云雾、水坝、四峰旗帜、UI/排版）。
 import { DATA } from './data.js';
 
 const $ = (id) => document.getElementById(id);
@@ -60,8 +63,8 @@ try {
   const imageryLayer = new Cesium.ImageryLayer(new Cesium.UrlTemplateImageryProvider({
     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
     maximumLevel: 18,
-    // 影像只拉 50km 范围矩形（覆盖地形外层框 + 余量），别全 globe 拉瓦片
-    rectangle: Cesium.Rectangle.fromDegrees(106.50, 22.65, 107.58, 23.65),
+    // 影像只拉 20km 范围矩形（覆盖地形外层框 + 余量），别全 globe 拉瓦片
+    rectangle: Cesium.Rectangle.fromDegrees(106.78, 22.92, 107.29, 23.39),
     credit: 'Esri, Maxar, Earthstar Geographics',
   }));
   const viewer = new Cesium.Viewer('cesiumContainer', {
@@ -72,12 +75,16 @@ try {
     vrButton: false, infoBox: false, selectionIndicator: false,
     requestRenderMode: true, maximumRenderTimeChange: Infinity,
   });
-  // ---- 流畅度（拖动卡）：手机降分辨率 + 拖动时降地形细节 + 关雾 ----
+  // ---- 流畅度（拖动卡）：手机降分辨率 + 拖动时降地形细节 ----
   // 窄屏（手机）DPR 上限 1.0（原来 1.5），渲染像素数降约 55%，是拖动卡顿的最大头；
   // 宽屏仍 1.5。本地 SwiftShader 帧率不代表手机，只看瓦片数/分辨率等可量化指标。
   const dprCap = window.innerWidth <= 760 ? 1.0 : 1.5;
   viewer.resolutionScale = Math.min(window.devicePixelRatio || 1, dprCap);
-  viewer.scene.fog.enabled = false; // 雾是每帧后处理，关掉省一笔；地形+影像本身已够真实
+  // 雾：v2 起按四季开（见 applySeason）。上一轮关雾是把它当成每帧后处理；
+  // 实测 Cesium 的雾只是地形片元着色器里的一项（density²×距离² 的指数雾），
+  // 不是额外渲染通道；窄屏 DPR 1.0 + 拖动 msse 4 仍在，雾的开销可忽略。
+  // 大气散射仍关（每帧算，贵；预设视角俯角大，天空基本不出画）。
+  viewer.scene.fog.enabled = true;
   viewer.scene.skyAtmosphere.show = false; // 大气散射每帧算，关掉；天空用底色（见 index.html 背景）
   viewer.scene.globe.maximumScreenSpaceError = 2;
   // 拖动时放宽到 4：瓦片细节降一档，拖动中少拉/少解码瓦片；停稳恢复 2
@@ -85,23 +92,23 @@ try {
     viewer.scene.globe.maximumScreenSpaceError = 4;
   });
 
-  // ---- 50km 范围限制：最大视野就是周边约 50km，不许缩到看整个地球 ----
+  // ---- 20km 范围限制：最大视野就是周边约 20km，不许缩到看整个地球 ----
   const CENTER_LON = 107.0365, CENTER_LAT = 23.155;
   const ctrl = viewer.scene.screenSpaceCameraController;
-  ctrl.maximumZoomDistance = 30000; // 相机到目标最远 30km（约 50km 范围的视野）
+  ctrl.maximumZoomDistance = 15000; // 相机到目标最远 15km（约 20km 范围的视野）
   ctrl.minimumZoomDistance = 100;
-  // 兜底：moveEnd 时相机高度 >25km 或地面位置离中心 >45km 就拉回
+  // 兜底：moveEnd 时相机高度 >12km 或地面位置离中心 >18km 就拉回
   const clampCamera = () => {
     const cart = viewer.camera.positionCartographic;
     if (!cart) return;
     const h = cart.height;
     const lon = Cesium.Math.toDegrees(cart.longitude), lat = Cesium.Math.toDegrees(cart.latitude);
     const distM = Math.hypot((lon - CENTER_LON) * 102000, (lat - CENTER_LAT) * 111000);
-    if (h <= 25000 && distM <= 45000) return;
-    const nh = Math.min(h, 25000);
+    if (h <= 12000 && distM <= 18000) return;
+    const nh = Math.min(h, 12000);
     let nlon = lon, nlat = lat;
-    if (distM > 45000) {
-      const s = 45000 / distM;
+    if (distM > 18000) {
+      const s = 18000 / distM;
       nlon = CENTER_LON + (lon - CENTER_LON) * s;
       nlat = CENTER_LAT + (lat - CENTER_LAT) * s;
     }
@@ -118,6 +125,7 @@ try {
   window.__terrainProvider = terrainProvider;
 
   // ---------- 徒步路线：三段环线（穿四峰），橙色；公路灰色 ----------
+  // 黑线改过的路线（round 2）一字不动；山脊支线也是环线的一部分，同色。
   for (const t of DATA.trails) {
     viewer.entities.add({
       name: t.name,
@@ -142,11 +150,18 @@ try {
   // 水库只保留视角预设（飞到湖心上空）和图例；范围以影像上的真实水面为准。
   // DEM 湖格轮廓与影像水面吻合（A/B 对照已验证），不需要再画。 ----------
 
+  // ---------- 标注总表：declutter 按这张表排叠（四峰 + 一级地点 + 二级途点等） ----------
+  // tier A（四峰/入口/广场/出口/水库）：高度 ≤2000m 显示标签，点常显；
+  // tier B（途点/停车场/村庄）：高度 ≤1500m 才显示（点+标签一起），更近景才出现，
+  // 与 v2.10.11 的分级（L2/L3 缩小才显示）同义。设施图标走公告板，不进排叠。
+  const labelItems = []; // {entity, anchor, tier, main, halfW, halfH, dy}
+  const D2R = Cesium.Math.toRadians;
+
   // ---------- 四峰标注：KML 高程做标签，锚点在网格实测高度 +40m ----------
   const peakEntities = [];
   for (const p of DATA.peaks) {
     const pos = Cesium.Cartesian3.fromDegrees(p.lon, p.lat, p.gridH + 40);
-    peakEntities.push(viewer.entities.add({
+    const e = viewer.entities.add({
       name: `${p.num}号峰 ${p.short}`,
       position: pos,
       point: { pixelSize: 7, color: Cesium.Color.WHITE, outlineColor: Cesium.Color.BLACK, outlineWidth: 2 },
@@ -161,14 +176,471 @@ try {
         pixelOffset: new Cesium.Cartesian2(0, -18),
         verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
       },
-    }));
+    });
+    e._popup = { title: `${p.num}号峰 ${p.short}`, meta: `${p.kmlH} m`, body: DATA.chatPeaks.find((c) => c.id === p.id)?.text || '', photo: null, fly: { lon: p.lon, lat: p.lat, h: p.gridH + 450, pitch: -35 } };
+    peakEntities.push(e);
+    labelItems.push({ entity: e, anchor: pos, tier: 'A', main: false, halfW: 75, halfH: 13, dy: -30 });
   }
 
-  // ---------- 四峰标签防重叠：按实际投影位置纵向排开 ----------
+  // ---------- 地面高程采样：树/途点/设施/村子/徒步环线/雨滴，一次批量取 ----------
+  // 用显示的地形本身采样（与峰高核对同一调用），点位落点与地形一致。
+  const hash = (a, b) => { const s = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return s - Math.floor(s); };
+  const haversineM = (a, b) => {
+    const R = 6371000, dLa = (b[1] - a[1]) * Math.PI / 180, dLo = (b[0] - a[0]) * Math.PI / 180;
+    const la1 = a[1] * Math.PI / 180, la2 = b[1] * Math.PI / 180;
+    const h = Math.sin(dLa / 2) ** 2 + Math.cos(la1) * Math.cos(la2) * Math.sin(dLo / 2) ** 2;
+    return 2 * R * Math.asin(Math.sqrt(h));
+  };
+  // 徒步环线：登山→下山→东侧返程收尾（与 v2.10.11 的闭合环一致；支线不走人）
+  const loopPts = [
+    ...DATA.trails[0].pts,
+    ...DATA.trails[1].pts.slice(1),
+    ...DATA.trails[2].pts.slice(1),
+  ];
+  const loopCum = [0];
+  for (let i = 1; i < loopPts.length; i++) loopCum.push(loopCum[i - 1] + haversineM(loopPts[i - 1], loopPts[i]));
+  const loopTotal = loopCum[loopCum.length - 1];
+  // 雨滴撒在环线一带上空（±434m × ±260m，高出地面 0–200m）
+  const rainSeeds = [];
+  for (let i = 0; i < 160; i++) {
+    rainSeeds.push([CENTER_LON + (Math.random() * 2 - 1) * 434 / 102000, CENTER_LAT + (Math.random() * 2 - 1) * 260 / 111000]);
+  }
+  const sampleCarts = [];
+  const cartFor = (lon, lat) => {
+    const c = Cesium.Cartographic.fromDegrees(lon, lat);
+    sampleCarts.push(c);
+    return c;
+  };
+  const treeCarts = DATA.trees.map((t) => cartFor(t[0], t[1]));
+  const wpCarts = DATA.waypoints.map((w) => cartFor(w.lon, w.lat));
+  const parkCarts = DATA.parking.map((p) => cartFor(p.lon, p.lat));
+  const facCarts = DATA.facilities.map((f) => cartFor(f.lon, f.lat));
+  const vilCarts = DATA.villages.map((v) => cartFor(v.lon, v.lat));
+  const plazaCart = cartFor(DATA.plaza.lon, DATA.plaza.lat);
+  const parkExitCart = cartFor(DATA.park_exit.lon, DATA.park_exit.lat);
+  const emgCart = cartFor(DATA.emergency_exit.lon, DATA.emergency_exit.lat);
+  const entCart = cartFor(DATA.entrance.lon, DATA.entrance.lat);
+  const lakeCart = cartFor(DATA.places[0].lon, DATA.places[0].lat);
+  const loopCarts = loopPts.map((p) => cartFor(p[0], p[1]));
+  const rainCarts = rainSeeds.map((p) => cartFor(p[0], p[1]));
+  let sampledOk = true;
+  try {
+    await Cesium.sampleTerrainMostDetailed(terrainProvider, sampleCarts);
+    log(`地面采样完成：${sampleCarts.length} 点`);
+  } catch (e) {
+    sampledOk = false;
+    log('地面采样失败（树/途点/徒步者暂不建）：' + e);
+  }
+  const groundStats = { sampledOk, sampled: sampleCarts.length, trees: 0, hikers: 0, clouds: 0 };
+  window.__groundStats = groundStats;
+
+  // ---------- 画布小图工具（补给站标签、设施图标、徒步者、雨丝都画在 canvas 上） ----------
+  const makeCanvas = (w, h, draw) => {
+    const cv = document.createElement('canvas');
+    cv.width = w; cv.height = h;
+    draw(cv.getContext('2d'), w, h);
+    return cv;
+  };
+  // 医疗红十字（v2.10.11 的 MED_ICO 同款：红底圆角 + 白十字）
+  const drawMed = (ctx, x, y, s) => {
+    ctx.fillStyle = '#c0392b';
+    ctx.beginPath(); ctx.roundRect(x, y, s, s, s * 0.2); ctx.fill();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = s * 0.16; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x + s / 2, y + s * 0.2); ctx.lineTo(x + s / 2, y + s * 0.8); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x + s * 0.2, y + s / 2); ctx.lineTo(x + s * 0.8, y + s / 2); ctx.stroke();
+  };
+  // 卫生间徽（蓝底白字 WC——canvas 里 🚻 在无头环境可能画成方框，WC 稳定可读）
+  const drawWc = (ctx, x, y, s) => {
+    ctx.fillStyle = '#2f7fc4';
+    ctx.beginPath(); ctx.roundRect(x, y, s, s, s * 0.2); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.font = `bold ${Math.round(s * 0.52)}px sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('WC', x + s / 2, y + s / 2 + 1);
+  };
+
+  // ---------- 树 672 棵：Pocket City 风格程序化卡通树，实例化批量画 ----------
+  // v2.10.11 的尺寸照搬（1 场景单位=21.71m，TREE_BOOST 1.4 已折进几何）：
+  // 云杉：锥 0.30r×0.85h（6 段）；阔叶：树干圆柱 + 压扁球冠（0.32r，纵向 ×0.85）。
+  // 3 个 InstancedMesh 等价物 = 3 个 Primitive（云杉/树干/树冠），共 3 次绘制。
+  // 季节换色 = 重建这 3 个 Primitive（实例颜色是静态顶点属性，改色只能重建，点一下才发生）。
+  const TREE = { coneH: 25.83, coneR: 9.12, trunkH: 9.73, trunkRT: 1.52, trunkRB: 2.13, crownR: 9.72 };
+  const TREE_OFF = { cone: 12.77, trunk: 4.86, crown: 16.72 };
+  let treePrims = [];
+  const enuMatrix = (lon, lat, h) => Cesium.Transforms.eastNorthUpToFixedFrame(Cesium.Cartesian3.fromDegrees(lon, lat, h));
+  const jitterColor = (hex, j) => Cesium.Color.fromCssColorString(hex).brighten(j, new Cesium.Color());
+  function buildTrees(seasonId) {
+    for (const p of treePrims) viewer.scene.primitives.remove(p);
+    treePrims = [];
+    if (!sampledOk) return;
+    const s = DATA.seasons[seasonId];
+    const spruceGeo = Cesium.CylinderGeometry.createGeometry(new Cesium.CylinderGeometry({
+      length: TREE.coneH, topRadius: 0.01, bottomRadius: TREE.coneR, radialSegments: 6 }));
+    const trunkGeo = Cesium.CylinderGeometry.createGeometry(new Cesium.CylinderGeometry({
+      length: TREE.trunkH, topRadius: TREE.trunkRT, bottomRadius: TREE.trunkRB, radialSegments: 5 }));
+    const crownGeo = Cesium.EllipsoidGeometry.createGeometry(new Cesium.EllipsoidGeometry({
+      radii: new Cesium.Cartesian3(TREE.crownR, TREE.crownR, TREE.crownR) }));
+    const spruceInst = [], trunkInst = [], crownInst = [];
+    const m4 = new Cesium.Matrix4();
+    DATA.trees.forEach((t, i) => {
+      const h = treeCarts[i].height;
+      if (h === undefined) return;
+      const sc = t[3];
+      const base = enuMatrix(t[0], t[1], h);
+      if (t[2] === 'spruce') {
+        let m = Cesium.Matrix4.multiplyByTranslation(base, new Cesium.Cartesian3(0, 0, TREE_OFF.cone * sc), new Cesium.Matrix4());
+        m = Cesium.Matrix4.multiplyByScale(m, new Cesium.Cartesian3(sc, sc, sc), m);
+        spruceInst.push(new Cesium.GeometryInstance({
+          geometry: spruceGeo, modelMatrix: m,
+          attributes: { color: Cesium.ColorGeometryInstanceAttribute.fromColor(jitterColor(s.spruce, (hash(i, 3) - 0.5) * 0.08)) },
+        }));
+      } else {
+        let mt = Cesium.Matrix4.multiplyByTranslation(base, new Cesium.Cartesian3(0, 0, TREE_OFF.trunk * sc), new Cesium.Matrix4());
+        mt = Cesium.Matrix4.multiplyByScale(mt, new Cesium.Cartesian3(sc, sc, sc), mt);
+        trunkInst.push(new Cesium.GeometryInstance({
+          geometry: trunkGeo, modelMatrix: mt,
+          attributes: { color: Cesium.ColorGeometryInstanceAttribute.fromColor(Cesium.Color.fromCssColorString('#6b4a2f')) },
+        }));
+        let mc = Cesium.Matrix4.multiplyByTranslation(base, new Cesium.Cartesian3(0, 0, TREE_OFF.crown * sc), new Cesium.Matrix4());
+        mc = Cesium.Matrix4.multiplyByScale(mc, new Cesium.Cartesian3(sc, sc, sc * 0.85), mc);
+        const broad = s.broad[i % s.broad.length];
+        crownInst.push(new Cesium.GeometryInstance({
+          geometry: crownGeo, modelMatrix: mc,
+          attributes: { color: Cesium.ColorGeometryInstanceAttribute.fromColor(jitterColor(broad, (hash(i, 5) - 0.5) * 0.08)) },
+        }));
+      }
+    });
+    const app = () => new Cesium.PerInstanceColorAppearance({ flat: true });
+    for (const list of [spruceInst, trunkInst, crownInst]) {
+      if (!list.length) continue;
+      treePrims.push(viewer.scene.primitives.add(new Cesium.Primitive({
+        geometryInstances: list, appearance: app(), asynchronous: false,
+      })));
+    }
+    groundStats.trees = spruceInst.length + crownInst.length;
+    log(`树已建：云杉 ${spruceInst.length} + 阔叶 ${crownInst.length}（${seasonId}）`);
+  }
+
+  // ---------- 标注点位：L1 地点 + 途点 + 停车场 + 村庄 ----------
+  // 点位样式沿用 v2.10.11 的分级（L1 常显、L2/L3 缩小才显），但 Cesium 里按
+  // 相机高度分两档：A 档 ≤2000m、B 档 ≤1500m（见 labelItems 注释）。
+  const tierBBoards = []; // B 档公告板（补给站标签、设施图标）：moveEnd 时与 B 档标签同显隐
+  const addMarkerEntity = (lon, lat, h, text, font, popup, tier, halfW) => {
+    const pos = Cesium.Cartesian3.fromDegrees(lon, lat, h);
+    const e = viewer.entities.add({
+      position: pos,
+      point: { pixelSize: tier === 'A' ? 7 : 5, color: Cesium.Color.WHITE, outlineColor: Cesium.Color.BLACK, outlineWidth: 2 },
+      label: {
+        text, font,
+        fillColor: Cesium.Color.WHITE, outlineColor: Cesium.Color.BLACK, outlineWidth: 2,
+        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+        showBackground: true, backgroundColor: Cesium.Color.fromCssColorString('rgba(10,20,35,0.78)'),
+        backgroundPadding: new Cesium.Cartesian2(6, 4),
+        pixelOffset: new Cesium.Cartesian2(0, -18),
+        verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+      },
+    });
+    if (popup) e._popup = popup;
+    labelItems.push({ entity: e, anchor: pos, tier, main: false, halfW, halfH: tier === 'A' ? 12 : 11, dy: tier === 'A' ? -28 : -26 });
+    return e;
+  };
+  if (sampledOk) {
+    // L1：登山入口 / 访客集散广场 / 园区出口 / 应急出口 / 伏曼水库
+    const L1 = [
+      { key: 'entrance', lon: DATA.entrance.lon, lat: DATA.entrance.lat, cart: entCart, text: '登山入口',
+        popup: { title: '登山入口', meta: '水库北岸 · 海拔约 488 m', body: '水库环线登山路线起点，自水库北岸上归元峰；访客集散广场在入口旁，园区出口与应急通道在南侧。', photo: DATA.entrance.photo, fly: { lon: DATA.entrance.lon, lat: DATA.entrance.lat, h: 900, pitch: -55 } } },
+      { key: 'plaza', lon: DATA.plaza.lon, lat: DATA.plaza.lat, cart: plazaCart, text: '访客集散广场 ★',
+        popup: { title: '访客集散广场', meta: '', body: '登山起点广场，水库北岸公路旁，停车、集散、出发。', photo: null, fly: { lon: DATA.plaza.lon, lat: DATA.plaza.lat, h: 900, pitch: -55 } } },
+      { key: 'parkexit', lon: DATA.park_exit.lon, lat: DATA.park_exit.lat, cart: parkExitCart, text: '园区出口',
+        popup: { title: '园区出口', meta: '应急通道起点 · 海拔约 498 m', body: '水库环线应急通道（下山中间的路）起点旁，下山路线终点附近，村道通往公路；应急出口在东侧下山路线终点。', photo: null, fly: { lon: DATA.park_exit.lon, lat: DATA.park_exit.lat, h: 900, pitch: -55 } } },
+      { key: 'emergency', lon: DATA.emergency_exit.lon, lat: DATA.emergency_exit.lat, cart: emgCart, text: '应急出口',
+        popup: { title: '应急出口', meta: '', body: '应急出口，下山路线终点（原园区出口处），村道直通公路。', photo: null, fly: { lon: DATA.emergency_exit.lon, lat: DATA.emergency_exit.lat, h: 900, pitch: -55 } } },
+      { key: 'lake', lon: DATA.places[0].lon, lat: DATA.places[0].lat, cart: lakeCart, text: '伏曼水库 497m',
+        popup: { title: '伏曼水库', meta: '湖面海拔约 497 m', body: '伏曼水库，东侧碧绿水库，湖心五岛，湖面海拔约 497 米。', photo: DATA.places[0].photo, fly: { lon: DATA.places[0].lon, lat: DATA.places[0].lat, h: 1200, pitch: -55 } } },
+    ];
+    for (const m of L1) {
+      addMarkerEntity(m.lon, m.lat, (m.cart.height ?? 600) + 15, m.text, 'bold 13px sans-serif', m.popup, 'A', 70);
+    }
+    // 13 途点：点 + 标签；补给站的标签是画出来的整块 pill（图标贴进标签里，
+    // 不是 20 米外的独立标记），所以这两处不用 Cesium 文字标签，只留点位。
+    const supplyBoards = viewer.scene.primitives.add(new Cesium.BillboardCollection());
+    DATA.waypoints.forEach((w, i) => {
+      const h = wpCarts[i].height ?? 600;
+      const popup = { title: w.label, meta: '', body: w.text, photo: null, fly: { lon: w.lon, lat: w.lat, h: 900, pitch: -55 } };
+      if (w.fac) {
+        const pos = Cesium.Cartesian3.fromDegrees(w.lon, w.lat, h + 8);
+        const e = viewer.entities.add({
+          position: pos,
+          point: { pixelSize: 5, color: Cesium.Color.fromCssColorString('#e0651f'), outlineColor: Cesium.Color.BLACK, outlineWidth: 2 },
+        });
+        e._popup = popup;
+        const label = w.label;
+        const cv = makeCanvas(300, 44, (ctx) => {
+          ctx.fillStyle = 'rgba(10,20,35,0.78)';
+          ctx.beginPath(); ctx.roundRect(0, 0, 300, 44, 12); ctx.fill();
+          ctx.strokeStyle = '#000'; ctx.lineWidth = 2; ctx.stroke();
+          ctx.fillStyle = '#fff'; ctx.font = 'bold 22px sans-serif';
+          ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+          ctx.fillText(label, 14, 23);
+          const tw = ctx.measureText(label).width;
+          drawMed(ctx, 14 + tw + 10, 9, 26);
+          drawWc(ctx, 14 + tw + 10 + 34, 9, 26);
+        });
+        const board = supplyBoards.add({
+          position: pos, image: cv, width: 150, height: 22,
+          pixelOffset: new Cesium.Cartesian2(0, -26),
+          verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+        });
+        board._popup = popup;
+        board.id = board; // pick 时 picked.id 就是它，_popup 才能被点击处理读到
+        tierBBoards.push(board);
+        // 补给站的公告板标签不进 declutter（固定在点位正上方，不参与排叠）
+      } else {
+        addMarkerEntity(w.lon, w.lat, h + 8, w.label, '11px sans-serif', popup, 'B', 55);
+      }
+    });
+    // 3 停车场
+    DATA.parking.forEach((p, i) => {
+      const h = parkCarts[i].height ?? 600;
+      addMarkerEntity(p.lon, p.lat, h + 8, '🅿 停车场', '11px sans-serif',
+        { title: `停车场 ${i + 1}`, meta: '景区公路边', body: '停车场，位于景区公路边。', photo: null, fly: { lon: p.lon, lat: p.lat, h: 900, pitch: -55 } }, 'B', 55);
+    });
+    // 6 村子：点位 + “村庄”标注（v2.10.11 里村子没有名字，只有屋群落点；
+    // 卫星图上本来就有真实屋顶，这里只落点位+标注，不另建 3D 房子、不编文案）
+    DATA.villages.forEach((v, i) => {
+      const h = vilCarts[i].height ?? 600;
+      addMarkerEntity(v.lon, v.lat, h + 8, '村庄', '11px sans-serif', null, 'B', 40);
+    });
+    // 3 设施：图标公告板（医疗红十字 / WC 徽），不带文字
+    const facBoards = viewer.scene.primitives.add(new Cesium.BillboardCollection());
+    DATA.facilities.forEach((f, i) => {
+      const h = facCarts[i].height ?? 600;
+      const cv = makeCanvas(40, 40, (ctx) => {
+        if (f.kind === 'med') drawMed(ctx, 2, 2, 36);
+        else drawWc(ctx, 2, 2, 36);
+      });
+      const board = facBoards.add({
+        position: Cesium.Cartesian3.fromDegrees(f.lon, f.lat, h + 10),
+        image: cv, width: 20, height: 20,
+        verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+      });
+      board._popup = { title: f.label, meta: '', body: f.text, photo: null, fly: { lon: f.lon, lat: f.lat, h: 900, pitch: -55 } };
+      board.id = board; // pick 时 picked.id 就是它
+      tierBBoards.push(board);
+    });
+  }
+
+  // ---------- 水坝：伏曼水库出水口，程序化梯形坝体（v2.10.11 的断面参数） ----------
+  // 下游坡 1:2.0 草绿、上游坡 1:0.8 混凝土、顶面深灰坝顶路；9 个断面放样。
+  // 注：坝顶 505m，DEM 在坝址处约 502–504m（SRTM 拍到了真坝体），坝体下半部
+  // 埋在地形里，只露上沿和下游坡下段——与 v2.10.11（DATA 里削过坝前地形）不同。
+  function loftGeometry(railA, railB) {
+    const n = railA.length;
+    const pos = new Float64Array(n * 2 * 3);
+    for (let i = 0; i < n; i++) {
+      pos[i * 3] = railA[i].x; pos[i * 3 + 1] = railA[i].y; pos[i * 3 + 2] = railA[i].z;
+      pos[(n + i) * 3] = railB[i].x; pos[(n + i) * 3 + 1] = railB[i].y; pos[(n + i) * 3 + 2] = railB[i].z;
+    }
+    const idx = [];
+    for (let i = 0; i < n - 1; i++) {
+      const a = i, b = i + 1, c = n + i, d = n + i + 1;
+      idx.push(a, c, b, b, c, d);
+    }
+    const geo = new Cesium.Geometry({
+      attributes: { position: new Cesium.GeometryAttribute({ componentDatatype: Cesium.ComponentDatatype.DOUBLE, componentsPerAttribute: 3, values: pos }) },
+      indices: new Uint16Array(idx),
+      primitiveType: Cesium.PrimitiveType.TRIANGLES,
+      boundingSphere: Cesium.BoundingSphere.fromPoints([...railA, ...railB]),
+    });
+    return Cesium.GeometryPipeline.computeNormal(geo);
+  }
+  function damFace(railA, railB, cssColor) {
+    viewer.scene.primitives.add(new Cesium.Primitive({
+      geometryInstances: new Cesium.GeometryInstance({
+        geometry: loftGeometry(railA, railB),
+        attributes: { color: Cesium.ColorGeometryInstanceAttribute.fromColor(Cesium.Color.fromCssColorString(cssColor)) },
+      }),
+      appearance: new Cesium.PerInstanceColorAppearance({ flat: true }),
+      asynchronous: false,
+    }));
+  }
+  {
+    const { A, axis, upstream, crest, halfM, stations } = DATA.dam;
+    const dn = [-upstream[0], -upstream[1]];
+    const pt = (s, dir, dist, h) => Cesium.Cartesian3.fromDegrees(
+      A[0] + ((axis[0] * s + dir[0] * dist) / 102000),
+      A[1] + ((axis[1] * s + dir[1] * dist) / 111000), h);
+    const crestDS = [], toeDS = [], crestUS = [], toeUS = [];
+    for (const [s, base] of stations) {
+      const H = Math.max(0, crest - base);
+      const yB = Math.min(base, crest);
+      crestDS.push(pt(s, dn, halfM, crest));
+      toeDS.push(pt(s, dn, halfM + 2.0 * H, yB));
+      crestUS.push(pt(s, upstream, halfM, crest));
+      toeUS.push(pt(s, upstream, halfM + 0.8 * H, yB));
+    }
+    damFace(crestDS, toeDS, '#7fae62'); // 下游草绿坡
+    damFace(crestUS, toeUS, '#d9d9d4'); // 上游混凝土坡
+    damFace(crestDS, crestUS, '#6f6f6a'); // 坝顶路
+    log('水坝已建：9 断面，顶 505m');
+  }
+
+  // ---------- 四峰旗帜：旗杆（实例化圆柱）+ 红旗（盒子，慢速摆动） ----------
+  // v2.10.11：旗杆 3.4 单位、旗面 1.10×0.68 单位、红旗飘扬；Cesium 里按真实米
+  // 折算后杆约 49m、旗 24×10m，会顶到四峰标签锚点（gridH+40m）——为避让标签，
+  // 杆取 30m、旗 20×6m，旗顶 27m、标签锚点仍在 40m，互不遮挡。
+  const flagPoles = [];
+  const flagBoxes = [];
+  {
+    const poleGeo = Cesium.CylinderGeometry.createGeometry(new Cesium.CylinderGeometry({
+      length: 30, topRadius: 0.5, bottomRadius: 0.5, radialSegments: 5 }));
+    const inst = DATA.peaks.map((p) => {
+      const base = enuMatrix(p.lon, p.lat, p.gridH);
+      const m = Cesium.Matrix4.multiplyByTranslation(base, new Cesium.Cartesian3(0, 0, 15), new Cesium.Matrix4());
+      return new Cesium.GeometryInstance({
+        geometry: poleGeo, modelMatrix: m,
+        attributes: { color: Cesium.ColorGeometryInstanceAttribute.fromColor(Cesium.Color.fromCssColorString('#3b2f12')) },
+      });
+    });
+    viewer.scene.primitives.add(new Cesium.Primitive({
+      geometryInstances: inst, appearance: new Cesium.PerInstanceColorAppearance({ flat: true }), asynchronous: false,
+    }));
+    DATA.peaks.forEach((p, i) => {
+      const e = viewer.entities.add({
+        position: Cesium.Cartesian3.fromDegrees(p.lon, p.lat, p.gridH + 24),
+        box: {
+          dimensions: new Cesium.Cartesian3(20, 0.3, 6),
+          material: Cesium.Color.fromCssColorString('#ac4931'),
+        },
+      });
+      flagBoxes.push({ entity: e, peak: p, phase: [0, 0.9, 1.7, 2.6][i] });
+    });
+    log('四峰旗帜已建：杆 30m、旗 20×6m');
+  }
+
+  // ---------- 徒步者 40 名：闭合环线单向无限循环（v2.10.11 同款） ----------
+  // 公告板小人（不是 40 个独立模型）：1 个 BillboardCollection，40 人 + 雨季 32 把伞。
+  // 速度 22–32m/s、stride-7 均布、季节按人数显隐，均照 v2.10.11。
+  const HIKER_COLS = ['#d68070', '#538e91', '#e2ad59', '#7994b4', '#b991a3', '#5f9e7f', '#c25a3c'];
+  const hikerBoards = viewer.scene.primitives.add(new Cesium.BillboardCollection());
+  const umbBoards = viewer.scene.primitives.add(new Cesium.BillboardCollection());
+  const hikers = [];
+  const hikerSprite = (color) => makeCanvas(32, 64, (ctx) => {
+    ctx.fillStyle = '#f0c5a1';
+    ctx.beginPath(); ctx.arc(16, 10, 7, 0, Math.PI * 2); ctx.fill(); // 头
+    ctx.fillStyle = color;
+    ctx.beginPath(); ctx.roundRect(8, 19, 16, 26, 7); ctx.fill(); // 身
+    ctx.fillStyle = '#333';
+    ctx.fillRect(10, 45, 5, 15); ctx.fillRect(17, 45, 5, 15); // 腿
+  });
+  const umbSprite = (color) => makeCanvas(48, 28, (ctx) => {
+    ctx.fillStyle = color;
+    ctx.beginPath(); ctx.arc(24, 24, 20, Math.PI, 0); ctx.closePath(); ctx.fill(); // 伞面
+    ctx.fillStyle = '#666'; ctx.fillRect(23, 24, 2, 4); // 伞柄
+  });
+  const hikerSprites = HIKER_COLS.map((c) => hikerSprite(c));
+  const umbSprites = HIKER_COLS.map((c) => umbSprite(c));
+  function pointAtLoop(s) {
+    let i = 1;
+    while (i < loopCum.length - 1 && loopCum[i] < s) i++;
+    const t = (s - loopCum[i - 1]) / Math.max(1e-6, loopCum[i] - loopCum[i - 1]);
+    const a = loopPts[i - 1], b = loopPts[i];
+    const ha = loopCarts[i - 1].height ?? 600, hb = loopCarts[i].height ?? 600;
+    return { lon: a[0] + (b[0] - a[0]) * t, lat: a[1] + (b[1] - a[1]) * t, h: ha + (hb - ha) * t };
+  }
+  if (sampledOk) {
+    for (let i = 0; i < 40; i++) {
+      const s0 = ((i * 7) % 40) * loopTotal / 40;
+      const board = hikerBoards.add({
+        image: hikerSprites[i % HIKER_COLS.length], width: 3, height: 6, sizeInMeters: true,
+        verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+        position: Cesium.Cartesian3.fromDegrees(107.0365, 23.155, 600),
+      });
+      let umb = null;
+      if (i % 5 !== 4) {
+        umb = umbBoards.add({
+          image: umbSprites[(i + 2) % HIKER_COLS.length], width: 5, height: 2.8, sizeInMeters: true,
+          verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+          position: Cesium.Cartesian3.fromDegrees(107.0365, 23.155, 607),
+        });
+      }
+      hikers.push({ s: s0, speed: 22 + Math.random() * 10, board, umb });
+    }
+    groundStats.hikers = hikers.length;
+    log(`徒步者已建：40 名，环线 ${Math.round(loopTotal)}m`);
+  }
+
+  // ---------- 云 36 团：半透明球团，往复漂移（v2.10.11 同款） ----------
+  // 3D 椭球实体（不是公告板——云从各角度看都要有体积）；每团 6 个球，共 36 个。
+  // 高 919–991m（v2.10.11 的 y 31–36 单位按 live 文件 exag 1.5 换算），
+  // 水平 ±434m 往复，速度 9.8–14.1m/s。
+  const cloudEnts = [];
+  if (sampledOk) {
+    for (const c of DATA.clouds) {
+      const puffs = c.puffs.map((pf) => viewer.entities.add({
+        position: Cesium.Cartesian3.fromDegrees(c.lon + pf.dLon, c.lat + pf.dLat, c.h + pf.dH),
+        ellipsoid: {
+          radii: new Cesium.Cartesian3(pf.rH, pf.rH, pf.rV),
+          material: Cesium.Color.WHITE.withAlpha(0.75),
+          outline: false,
+        },
+      }));
+      cloudEnts.push({ def: c, puffs, x: 0, dir: c.dir });
+    }
+    groundStats.clouds = cloudEnts.length;
+    log(`云已建：${cloudEnts.length} 朵 × 6 团`);
+  }
+
+  // ---------- 雨：160 条雨丝（雨季才显示） ----------
+  // 公告板竖线（不是每帧重建几何）：160 个小公告板，15fps 下落、触地回顶。
+  const rainBoards = viewer.scene.primitives.add(new Cesium.BillboardCollection());
+  rainBoards.show = false;
+  const rainStreaks = [];
+  const rainSprite = makeCanvas(8, 64, (ctx) => {
+    const g = ctx.createLinearGradient(0, 0, 0, 64);
+    g.addColorStop(0, 'rgba(127,163,184,0)');
+    g.addColorStop(0.5, 'rgba(127,163,184,0.55)');
+    g.addColorStop(1, 'rgba(127,163,184,0)');
+    ctx.fillStyle = g; ctx.fillRect(3, 0, 2, 64);
+  });
+  if (sampledOk) {
+    rainSeeds.forEach((p, i) => {
+      const groundH = rainCarts[i].height ?? 600;
+      const y = groundH + 20 + Math.random() * 180;
+      const board = rainBoards.add({
+        image: rainSprite, width: 0.5, height: 7, sizeInMeters: true,
+        verticalOrigin: Cesium.VerticalOrigin.CENTER,
+        position: Cesium.Cartesian3.fromDegrees(p[0], p[1], y),
+      });
+      rainStreaks.push({ lon: p[0], lat: p[1], groundH, y, board });
+    });
+  }
+
+  // ---------- 四季：雾密度 / 树色 / 徒步者人数 / 雨 ----------
+  // 雾密度由 v2.10.11 的雾 near/far（米）换算：density=0.83/((near+far)/2)，
+  // 对应 Cesium 的 density²×距离² 指数雾——春 3.3km 起雾、5.6km 渐浓，以此类推。
+  let curSeason = 'spring';
+  function applySeason(id) {
+    if (!DATA.seasons[id]) return;
+    curSeason = id;
+    const s = DATA.seasons[id];
+    viewer.scene.fog.density = 0.83 / ((s.fogM[0] + s.fogM[1]) / 2);
+    buildTrees(id);
+    rainBoards.show = (id === 'rain');
+    const note = $('seasonNote');
+    if (note) note.innerHTML = s.note + ' <a href="https://www.weather.com.cn/cityintro/101300201.shtml" target="_blank" rel="noopener">中国天气网 · 崇左 ↗</a>';
+    document.querySelectorAll('#seasonChips .chip').forEach((b) => b.classList.toggle('on', b.dataset.season === id));
+    window.__season = id;
+    window.__fogDensity = viewer.scene.fog.density;
+    log(`季节：${s.label}，雾密度 ${viewer.scene.fog.density.toFixed(6)}，徒步者 ${s.hikers} 名`);
+    viewer.scene.requestRender();
+  }
+  window.__applySeason = applySeason;
+
+  // ---------- 标签排叠：按实际投影位置纵向排开（四峰 + 一级 + 二级全表） ----------
   // 总览视角（全景/水库）只留山顶点、不显示标签（按钮栏里已有峰名，
   // 点按钮飞过去再看标签——按缩放级别取舍标注的常规做法）；
-  // 四峰特写视角（约 1170m）正常显示标签。
-  // 规则（2026-11-26 返修，终版截图核对后重写）：
+  // 四峰特写视角（约 1170m）正常显示标签，途点等 B 档在 ≤1500m 时出现。
+  // 规则（沿用 stage-1 的返修终版，推广到全表）：
   // (a) 锚点投影出视口（留边距）的标签直接隐藏，排叠不许把它拉回视口内；
   // (b) 特写里重叠的标签沿纵向排开直到不重叠，排不开的隐藏，
   //     但当前视角主峰自己的标签必须可见：主峰先定位置，其他标签
@@ -179,55 +651,71 @@ try {
   //     飞行落定后的 1900ms 定时是兜底）。
   // 坑：e.label.show 是 Property 对象，恒为真值——不能用 !e.label.show
   // 判断，必须用本地布尔值 shown，否则出界标签会混进排叠、把别的标签全挤掉。
-  const PILL_HALF_H = 13, PILL_HALF_W = 75, MIN_GAP = 30;
+  const MIN_GAP = 28;
   let labelsEnabled = false; // 初始视角是全景，总览不显示标签
   let currentMainPeak = null; // 当前特写视角的主峰实体（总览视角为 null）
+  window.__labelBoxes = [];
   const declutterLabels = () => {
-    const showLabels = labelsEnabled && viewer.camera.positionCartographic.height <= 2000;
+    const h = viewer.camera.positionCartographic.height;
+    const showA = labelsEnabled && h <= 2000;
+    const showB = labelsEnabled && h <= 1500;
     const cw = viewer.scene.canvas.clientWidth, ch = viewer.scene.canvas.clientHeight;
     const viewsTop = $('views').getBoundingClientRect().top;
     const titleRect = $('title').getBoundingClientRect();
     // pill 中心纵向安全带：顶缘留 30px，底缘在按钮栏之上
-    const safeTop = 30, safeBottom = Math.max(safeTop, viewsTop - PILL_HALF_H - 2);
+    const safeTop = 30, safeBottom = Math.max(safeTop, viewsTop - 13 - 2);
     const items = [];
-    for (const e of peakEntities) {
-      const s = viewer.scene.cartesianToCanvasCoordinates(e.position.getValue(viewer.clock.currentTime));
-      // (a) 锚点须在视口内（留边距）；pill 贴在锚点上方 30px，
+    window.__labelBoxes = [];
+    for (const it of labelItems) {
+      const showTier = it.tier === 'A' ? showA : showB;
+      const s = viewer.scene.cartesianToCanvasCoordinates(it.anchor);
+      // (a) 锚点须在视口内（留边距）；pill 贴在锚点上方，
       //     所以锚点纵向可到安全带底缘 +30（pill 自然位置仍在带内），
       //     再低 pill 就要压按钮栏——主峰也一样，排叠会把它夹紧到带内
       const inView = s && s.x > 20 && s.x < cw - 20 && s.y > 15 && s.y < safeBottom + 30;
-      const shown = showLabels && inView;
-      e.label.show = shown;
+      const shown = showTier && inView;
+      it.entity.label.show = shown;
       if (!shown) continue;
-      items.push({ e, x: s.x, y: s.y, main: e === currentMainPeak });
+      items.push({ ...it, x: s.x, y: s.y, main: it.entity === currentMainPeak });
+    }
+    // B 档公告板（补给站标签、设施图标）：与 B 档标签同显隐（只判高度+视口，不排叠）
+    for (const b of tierBBoards) {
+      const s = viewer.scene.cartesianToCanvasCoordinates(b.position);
+      b.show = showB && !!s && s.x > 10 && s.x < cw - 10 && s.y > 10 && s.y < ch - 10;
     }
     // (c) 横向夹紧：pill 不出视口左右；若 pill 大幅压住标题卡，横向挪开
     //     （标题卡在小屏上占半幅宽，只上下移会把标签挤出安全带；
     //     挪开后 pill 仍在锚点附近；只擦到标题卡边缘（≤4px）的不挪）
     const computeOx = (it, target) => {
       let ox = 0;
-      if (it.x - PILL_HALF_W < 4) ox = 4 - (it.x - PILL_HALF_W);
-      else if (it.x + PILL_HALF_W > cw - 4) ox = cw - 4 - (it.x + PILL_HALF_W);
-      const pillTop = target - PILL_HALF_H, pillBottom = target + PILL_HALF_H;
+      if (it.x - it.halfW < 4) ox = 4 - (it.x - it.halfW);
+      else if (it.x + it.halfW > cw - 4) ox = cw - 4 - (it.x + it.halfW);
+      const pillTop = target - it.halfH, pillBottom = target + it.halfH;
       const vOverlap = Math.min(pillBottom, titleRect.bottom - 2) - Math.max(pillTop, titleRect.top + 2);
       if (vOverlap > 4) {
-        const left = it.x + ox - PILL_HALF_W, right = it.x + ox + PILL_HALF_W;
+        const left = it.x + ox - it.halfW, right = it.x + ox + it.halfW;
         if (right > titleRect.left + 2 && left < titleRect.right - 2) {
           const shiftRight = titleRect.right + 2 - left;
           const shiftLeft = titleRect.left - 2 - right;
-          if (it.x + ox + shiftRight + PILL_HALF_W <= cw - 4) ox += shiftRight;
-          else if (it.x + ox + shiftLeft - PILL_HALF_W >= 4) ox += shiftLeft;
+          if (it.x + ox + shiftRight + it.halfW <= cw - 4) ox += shiftRight;
+          else if (it.x + ox + shiftLeft - it.halfW >= 4) ox += shiftLeft;
         }
       }
       return ox;
     };
     const placeOne = (it, target) => {
-      it.e.label.pixelOffset = new Cesium.Cartesian2(computeOx(it, target), target - it.y + PILL_HALF_H);
+      it.entity.label.pixelOffset = new Cesium.Cartesian2(computeOx(it, target), target - it.y + it.halfH);
+      window.__labelBoxes.push({
+        name: it.entity.name || it.entity._popup?.title || '',
+        x: Math.round(it.x + computeOx(it, target) - it.halfW), y: Math.round(target - it.halfH),
+        w: it.halfW * 2, h: it.halfH * 2,
+        ax: Math.round(it.x), ay: Math.round(it.y), // 锚点（供验证：pill 不得压住自己的锚点圆点）
+      });
       return target;
     };
-    const hitsTitle = (centerY, x, ox = 0) => {
-      const top = centerY - PILL_HALF_H, bottom = centerY + PILL_HALF_H;
-      const left = x + ox - PILL_HALF_W, right = x + ox + PILL_HALF_W;
+    const hitsTitle = (centerY, x, ox = 0, halfW = 75, halfH = 13) => {
+      const top = centerY - halfH, bottom = centerY + halfH;
+      const left = x + ox - halfW, right = x + ox + halfW;
       return right > titleRect.left + 2 && left < titleRect.right - 2 &&
         bottom > titleRect.top + 2 && top < titleRect.bottom - 2;
     };
@@ -235,10 +723,14 @@ try {
     const mainItem = items.find((it) => it.main);
     let mainTarget = null;
     if (mainItem) {
-      let t = mainItem.y - 30;
+      let t = mainItem.y + mainItem.dy;
       if (t < safeTop) t = safeTop;
       if (t > safeBottom) t = safeBottom;
-      if (hitsTitle(t, mainItem.x, computeOx(mainItem, t))) t = Math.min(titleRect.bottom + PILL_HALF_H + 2, safeBottom);
+      if (hitsTitle(t, mainItem.x, computeOx(mainItem, t), mainItem.halfW, mainItem.halfH)) {
+        t = Math.min(titleRect.bottom + mainItem.halfH + 2, safeBottom);
+      }
+      // pill 底缘不得压住自己的锚点圆点（锚点在正上方是既定规则）：只许往上挪
+      if (t + mainItem.halfH > mainItem.y - 6) t = mainItem.y - mainItem.halfH - 6;
       mainTarget = placeOne(mainItem, t);
     }
     const others = items.filter((it) => !it.main);
@@ -247,31 +739,41 @@ try {
       others.sort((a, b) => a.y - b.y);
       let prev = -Infinity;
       for (const it of others) {
-        let target = Math.max(it.y - 30, prev + MIN_GAP);
-        if (hitsTitle(target, it.x, computeOx(it, target))) target = titleRect.bottom + PILL_HALF_H + 2;
+        let target = Math.max(it.y + it.dy, prev + MIN_GAP);
+        if (hitsTitle(target, it.x, computeOx(it, target), it.halfW, it.halfH)) {
+          target = titleRect.bottom + it.halfH + 2;
+        }
         if (target < safeTop) target = safeTop;
-        if (target > safeBottom) { it.e.label.show = false; continue; }
+        if (target > safeBottom) { it.entity.label.show = false; continue; }
+        // 往下排时 pill 底缘不得压住自己的锚点圆点：排不下就隐藏，不硬盖
+        if (target + it.halfH > it.y - 6) { it.entity.label.show = false; continue; }
         prev = placeOne(it, target);
       }
     } else {
       // 上方组：离主峰近的先排，向上依次排开
-      const above = others.filter((it) => it.y - 30 < mainTarget).sort((a, b) => (b.y - 30) - (a.y - 30));
+      const above = others.filter((it) => it.y + it.dy < mainTarget).sort((a, b) => (b.y + b.dy) - (a.y + a.dy));
       let prevAbove = mainTarget;
       for (const it of above) {
-        let target = Math.min(it.y - 30, prevAbove - MIN_GAP);
-        if (hitsTitle(target, it.x, computeOx(it, target))) target = titleRect.bottom + PILL_HALF_H + 2;
-        if (target > prevAbove - MIN_GAP || target < safeTop) { it.e.label.show = false; continue; }
+        let target = Math.min(it.y + it.dy, prevAbove - MIN_GAP);
+        if (hitsTitle(target, it.x, computeOx(it, target), it.halfW, it.halfH)) {
+          target = titleRect.bottom + it.halfH + 2;
+        }
+        if (target > prevAbove - MIN_GAP || target < safeTop) { it.entity.label.show = false; continue; }
         prevAbove = placeOne(it, target);
       }
       // 下方组：离主峰近的先排，向下依次排开
-      const below = others.filter((it) => it.y - 30 >= mainTarget).sort((a, b) => (a.y - 30) - (b.y - 30));
+      const below = others.filter((it) => it.y + it.dy >= mainTarget).sort((a, b) => (a.y + a.dy) - (b.y + b.dy));
       let prevBelow = mainTarget;
       for (const it of below) {
-        let target = Math.max(it.y - 30, prevBelow + MIN_GAP);
-        if (hitsTitle(target, it.x, computeOx(it, target))) target = titleRect.bottom + PILL_HALF_H + 2;
-        if (target > safeBottom) { it.e.label.show = false; continue; }
+        let target = Math.max(it.y + it.dy, prevBelow + MIN_GAP);
+        if (hitsTitle(target, it.x, computeOx(it, target), it.halfW, it.halfH)) {
+          target = titleRect.bottom + it.halfH + 2;
+        }
+        if (target > safeBottom) { it.entity.label.show = false; continue; }
         if (target < prevBelow + MIN_GAP) target = prevBelow + MIN_GAP;
-        if (target > safeBottom) { it.e.label.show = false; continue; }
+        if (target > safeBottom) { it.entity.label.show = false; continue; }
+        // 往下排时 pill 底缘不得压住自己的锚点圆点：排不下就隐藏，不硬盖
+        if (target + it.halfH > it.y - 6) { it.entity.label.show = false; continue; }
         prevBelow = placeOne(it, target);
       }
     }
@@ -281,6 +783,7 @@ try {
   window.__debugLabels = () => ({
     labelsEnabled, mainPeak: currentMainPeak ? currentMainPeak.name : null,
     height: viewer.camera.positionCartographic.height,
+    labelBoxes: window.__labelBoxes.length,
   });
   viewer.camera.moveEnd.addEventListener(() => {
     viewer.scene.globe.maximumScreenSpaceError = 2; // 停稳恢复全细节
@@ -293,7 +796,6 @@ try {
   });
 
   // ---------- 视角预设 ----------
-  const D2R = Cesium.Math.toRadians;
   const fly = (lon, lat, height, pitchDeg, duration = 1.6) => {
     viewer.camera.flyTo({
       destination: Cesium.Cartesian3.fromDegrees(lon, lat, height),
@@ -301,6 +803,7 @@ try {
       duration,
     });
   };
+  window.__fly = fly;
   const views = [
     { name: '全景', labels: false, run: () => fly(107.0365, 23.1445, 3000, -55) },
     ...DATA.peaks.map((p, j) => ({
@@ -315,8 +818,9 @@ try {
   views.forEach((v, i) => {
     const b = document.createElement('button');
     b.textContent = v.name;
+    b.dataset.view = v.name;
     b.onclick = () => {
-      viewsEl.querySelectorAll('button').forEach((x) => x.classList.remove('active'));
+      viewsEl.querySelectorAll('button[data-view]').forEach((x) => x.classList.remove('active'));
       b.classList.add('active');
       window.__view = v.name;
       labelsEnabled = v.labels !== false;
@@ -328,11 +832,461 @@ try {
     viewsEl.appendChild(b);
     if (i === 0) b.classList.add('active');
   });
+  // 底部按钮栏后半段：功能按钮（与视角按钮同一行横向滚动）
+  const funcSep = document.createElement('span');
+  funcSep.className = 'sep';
+  viewsEl.appendChild(funcSep);
+  const funcBtns = [
+    { label: '🍂 四季', sheet: 'seasons' },
+    { label: '🗺 图例', sheet: 'legend' },
+    { label: 'ⓘ 景区介绍', sheet: 'info' },
+  ];
+  for (const f of funcBtns) {
+    const b = document.createElement('button');
+    b.textContent = f.label;
+    b.className = 'func';
+    b.onclick = () => openSheet(f.sheet);
+    viewsEl.appendChild(b);
+  }
   window.__views = views.map((v) => v.name);
   window.__applyView = (name) => {
-    const b = [...viewsEl.querySelectorAll('button')].find((x) => x.textContent === name);
+    const b = [...viewsEl.querySelectorAll('button[data-view]')].find((x) => x.textContent === name);
     if (b) b.click();
   };
+
+  // ---------- 浮层：一次只开一个（sheet / 聊天 / 弹窗互斥） ----------
+  let photosCache = null;
+  async function loadPhotos() {
+    if (photosCache) return photosCache;
+    try {
+      photosCache = await (await fetch('./photos.json')).json();
+    } catch (e) { photosCache = {}; log('photos.json 加载失败：' + e); }
+    return photosCache;
+  }
+  function closeSheets() {
+    document.querySelectorAll('.sheet').forEach((s) => { s.hidden = true; });
+    document.querySelectorAll('#views button.func').forEach((b) => b.classList.remove('on'));
+    $('nearbyBtn')?.classList.remove('on');
+  }
+  function closeChat() { $('chatPanel').hidden = true; }
+  function closeDetail() { $('detail').hidden = true; }
+  function closeAllOverlays() { closeSheets(); closeChat(); closeDetail(); }
+  function openSheet(id) {
+    const sh = $('sheet-' + id);
+    if (!sh) return;
+    const wasHidden = sh.hidden;
+    closeAllOverlays();
+    if (wasHidden) {
+      sh.hidden = false;
+      const btn = [...document.querySelectorAll('#views button.func')].find((b) => b.textContent.includes({ seasons: '四季', legend: '图例', info: '景区介绍', nearby: '附近' }[id] || ''));
+      if (btn) btn.classList.add('on');
+      if (id === 'nearby') { nearbyRender(); $('nearbyBtn')?.classList.add('on'); }
+    }
+    viewer.scene.requestRender();
+  }
+  window.__openSheet = openSheet;
+  document.querySelectorAll('.sheet [data-close]').forEach((b) => b.addEventListener('click', closeSheets));
+  $('detailX').addEventListener('click', closeDetail);
+  $('nearbyBtn').addEventListener('click', () => openSheet('nearby'));
+
+  // ---------- 详情弹窗（v2.10.11 的样式：照片 16:9 + 标题 + meta + 正文 + 导航） ----------
+  async function showDetail(title, meta, body, photoKey, navUrl, flyTo) {
+    closeAllOverlays();
+    $('detailTitle').textContent = title;
+    $('detailMeta').textContent = meta || '';
+    $('detailBody').textContent = body || '';
+    const ph = $('detailPhoto'), img = $('detailPhotoImg');
+    let src = null;
+    if (photoKey) {
+      const photos = await loadPhotos();
+      src = photos[photoKey] || null;
+    }
+    if (src) { img.src = src; ph.hidden = false; } else { ph.hidden = true; img.removeAttribute('src'); }
+    const nv = $('detailNav');
+    if (navUrl) { nv.href = navUrl; nv.hidden = false; } else { nv.hidden = true; nv.removeAttribute('href'); }
+    $('detail').hidden = false;
+    if (flyTo) {
+      labelsEnabled = true;
+      currentMainPeak = null;
+      fly(flyTo.lon, flyTo.lat, flyTo.h, flyTo.pitch ?? -55);
+      setTimeout(declutterLabels, 1900);
+    }
+    viewer.scene.requestRender();
+  }
+  window.__openDetail = (title) => {
+    const all = [...viewer.entities.values];
+    const e = all.find((x) => x._popup && x._popup.title === title);
+    if (e) { const p = e._popup; showDetail(p.title, p.meta, p.body, p.photo, null, p.fly); return true; }
+    for (const b of tierBBoards) {
+      if (b._popup && b._popup.title === title) {
+        const p = b._popup; showDetail(p.title, p.meta, p.body, p.photo, null, p.fly); return true;
+      }
+    }
+    return false;
+  };
+
+  // ---------- 定位：GPS 蓝点 + 精度圈（v2.10.11 同款逻辑） ----------
+  // watchPosition 持续跟踪；首次定位成功镜头飞到该点；之后人走动蓝点跟着走，
+  // 镜头不动。范围外 / 失败 / 无权限只弹一句友好提示，不报错不卡住。
+  // 页面须 HTTPS 才有定位（GitHub Pages 是 HTTPS）；微信内置浏览器可用，不用接 JS-SDK。
+  const GEO_BBOX = { lon0: 107.02325, lon1: 107.04975, lat0: 23.142, lat1: 23.168 };
+  let geoWatch = null, geoFirst = true, userLoc = null;
+  let geoDotEnt = null, geoAccEnt = null, geoPulseEnt = null, geoAccR = 20;
+  const geoToast = (msg) => {
+    const t = $('toast'); if (!t) return;
+    t.textContent = msg; t.hidden = false;
+    clearTimeout(t._h); t._h = setTimeout(() => { t.hidden = true; }, 3800);
+  };
+  function geoMakeDot() {
+    if (geoDotEnt) return;
+    geoDotEnt = viewer.entities.add({
+      point: { pixelSize: 14, color: Cesium.Color.fromCssColorString('#2f7bff'), outlineColor: Cesium.Color.WHITE, outlineWidth: 3, disableDepthTestDistance: Number.POSITIVE_INFINITY },
+      position: Cesium.Cartesian3.fromDegrees(107.0365, 23.155, 600),
+    });
+    geoAccEnt = viewer.entities.add({
+      ellipse: {
+        semiMajorAxis: 20, semiMinorAxis: 20,
+        material: Cesium.Color.fromCssColorString('#2f7bff').withAlpha(0.16),
+        outline: true, outlineColor: Cesium.Color.fromCssColorString('#2f7bff').withAlpha(0.45),
+        heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+      },
+      position: Cesium.Cartesian3.fromDegrees(107.0365, 23.155, 0),
+    });
+    geoPulseEnt = viewer.entities.add({
+      ellipse: {
+        semiMajorAxis: 20, semiMinorAxis: 20,
+        material: new Cesium.ColorMaterialProperty(new Cesium.Color(0.18, 0.48, 1.0, 0.5)),
+        heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+      },
+      position: Cesium.Cartesian3.fromDegrees(107.0365, 23.155, 0),
+    });
+    geoDotEnt.show = false; geoAccEnt.show = false; geoPulseEnt.show = false;
+  }
+  function geoPlace(lon, lat, acc) {
+    geoAccR = Math.max(10, acc || 20);
+    geoDotEnt.position = Cesium.Cartesian3.fromDegrees(lon, lat, 0);
+    geoDotEnt.point.heightReference = Cesium.HeightReference.CLAMP_TO_GROUND;
+    geoDotEnt.show = true;
+    geoAccEnt.position = Cesium.Cartesian3.fromDegrees(lon, lat, 0);
+    geoAccEnt.ellipse.semiMajorAxis = geoAccR;
+    geoAccEnt.ellipse.semiMinorAxis = geoAccR;
+    geoAccEnt.show = true;
+    geoPulseEnt.position = Cesium.Cartesian3.fromDegrees(lon, lat, 0);
+    geoPulseEnt.show = true;
+  }
+  function onGeoPos(pos) {
+    if (geoWatch === null) return; // 停止后到的定位不处理
+    const lon = pos.coords.longitude, lat = pos.coords.latitude, acc = pos.coords.accuracy;
+    if (lon < GEO_BBOX.lon0 || lon > GEO_BBOX.lon1 || lat < GEO_BBOX.lat0 || lat > GEO_BBOX.lat1) {
+      geoToast('当前位置不在地图范围内'); return;
+    }
+    geoMakeDot(); geoPlace(lon, lat, acc);
+    userLoc = { lon, lat };
+    if (geoFirst) {
+      geoFirst = false;
+      const h = Math.min(viewer.camera.positionCartographic.height, 1200);
+      fly(lon, lat, h, -55);
+      geoToast(`已定位，精度约 ±${Math.round(acc || 20)} 米`);
+    }
+    if (!$('sheet-nearby').hidden) nearbyRender();
+  }
+  function onGeoErr() {
+    if (geoWatch === null) return;
+    geoToast('无法获取位置，请在浏览器/微信里允许定位权限');
+    stopLocate();
+  }
+  function startLocate() {
+    if (typeof navigator === 'undefined' || !('geolocation' in navigator)) {
+      geoToast('无法获取位置，请在浏览器/微信里允许定位权限'); return;
+    }
+    if (geoWatch !== null) return;
+    geoFirst = true;
+    geoWatch = navigator.geolocation.watchPosition(onGeoPos, onGeoErr, { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 });
+    $('locateBtn').classList.add('on');
+  }
+  function stopLocate() {
+    if (geoWatch !== null && typeof navigator !== 'undefined' && navigator.geolocation && navigator.geolocation.clearWatch) {
+      navigator.geolocation.clearWatch(geoWatch);
+    }
+    geoWatch = null;
+    const t = $('toast'); if (t) { clearTimeout(t._h); t.hidden = true; }
+    userLoc = null;
+    if (geoDotEnt) geoDotEnt.show = false;
+    if (geoAccEnt) geoAccEnt.show = false;
+    if (geoPulseEnt) geoPulseEnt.show = false;
+    $('locateBtn').classList.remove('on');
+  }
+  $('locateBtn').addEventListener('click', () => { if (geoWatch !== null) stopLocate(); else startLocate(); });
+  window.__locateState = () => ({ watching: geoWatch !== null, userLoc });
+
+  // ---------- 附近推荐（v2.10.11 同款：直线距离，用户定位后按 GPS 重排） ----------
+  const JLS_CENTER = { lon: 107.0365, lat: 23.1550 };
+  function nearbyDistM(aLon, aLat, bLon, bLat) {
+    const R = 6371000, dLa = (bLat - aLat) * Math.PI / 180, dLo = (bLon - aLon) * Math.PI / 180;
+    const la1 = aLat * Math.PI / 180, la2 = bLat * Math.PI / 180;
+    const h = Math.sin(dLa / 2) ** 2 + Math.cos(la1) * Math.cos(la2) * Math.sin(dLo / 2) ** 2;
+    return 2 * R * Math.asin(Math.sqrt(h));
+  }
+  const nearbyFmt = (m) => (m < 1000 ? '约 ' + Math.round(m) + ' 米' : '约 ' + (m / 1000).toFixed(1) + ' 公里');
+  const nearbyRef = () => (userLoc ? { lon: userLoc.lon, lat: userLoc.lat, gps: true } : { lon: JLS_CENTER.lon, lat: JLS_CENTER.lat, gps: false });
+  const nearbySorted = () => {
+    const ref = nearbyRef();
+    return DATA.nearby.map((s) => ({ s, d: s.est ? Infinity : nearbyDistM(ref.lon, ref.lat, s.lon, s.lat) })).sort((a, b) => a.d - b.d);
+  };
+  const nearbyNavUrl = (name) => 'https://uri.amap.com/search?keyword=' + encodeURIComponent(name);
+  function nearbyOpenSpot(s) {
+    const ref = nearbyRef();
+    const d = nearbyDistM(ref.lon, ref.lat, s.lon, s.lat);
+    const meta = s.est ? '' : (s.grade ? s.grade + ' · ' : '') + nearbyFmt(d) + '（直线距离）';
+    showDetail(s.name, meta, s.intro + '\n位置：' + s.loc, null, nearbyNavUrl(s.name), null);
+  }
+  function nearbyRender() {
+    const list = $('nearbyList'), note = $('nearbyNote');
+    if (!list) return;
+    const ref = nearbyRef();
+    if (note) note.textContent = ref.gps ? '距你当前位置（GPS）· 直线距离（非车程）' : '距剑龙山景区中心 · 直线距离（非车程），点右上角 ◎ 定位后按你的位置排';
+    list.innerHTML = '';
+    for (const it of nearbySorted()) {
+      const s = it.s;
+      const row = document.createElement('div');
+      row.className = 'nrow';
+      row.innerHTML = '<div class="nhead"><span class="nico">' + s.icon + '</span><span class="nname">' + s.name + '</span><span class="ndist">' + (s.est ? '' : nearbyFmt(it.d)) + '</span></div><div class="nintro">' + s.intro + '</div><div class="nloc">' + s.loc + '</div>';
+      row.addEventListener('click', () => nearbyOpenSpot(s));
+      list.appendChild(row);
+    }
+  }
+  function nearbyChatHtml() {
+    const ref = nearbyRef();
+    const items = nearbySorted();
+    let h = ref.gps ? '📍 附近推荐景点（距你当前位置，直线距离）：<br>'
+      : '未定位，按地图中心排序，点右上角 ◎ 定位后更准<br>📍 附近推荐景点（距剑龙山景区中心，直线距离）：<br>';
+    h += items.map((it, i) => {
+      const s = it.s;
+      return (i + 1) + '. <b>' + s.name + '</b>' + (s.est ? '' : ' · ' + nearbyFmt(it.d)) + '<br><span style="color:#cfe0ef">' + s.intro + '</span><br>' +
+        '<button class="mapbtn" data-near="' + s.name + '">📖 简介</button> ' +
+        '<a class="mapbtn" href="' + nearbyNavUrl(s.name) + '" target="_blank" rel="noopener">🧭 导航</a>';
+    }).join('<br>');
+    return h;
+  }
+
+  // ---------- 景区小助理：轻量关键词问答（内容照搬 v2.10.11，数字按 Cesium 现状改） ----------
+  // 改了两处数字（见 BUILD-NOTES）：环线 2.2km→2.1km、三段 999/828/348m→778/833/536m
+  // （黑线改线后的实测长度）；四峰标高用 KML（637/693/694/677，与地图标签一致）。
+  // 其余文案（时间、门票、电话、地址）一字不动。
+  const CHAT_TOPICS = [
+    { id: 'nearby', label: '附近推荐景点', kw: ['附近', '推荐', '最近', '周边', '周围', '去哪'], ans: '', nearby: true },
+    { id: 'peaks', label: '四峰导览', kw: ['四峰', '峰', '初脊', '剑板', '天柱', '归元', '山峰', '板峰', '看什么', '景点'],
+      ans: '剑龙山四峰，点一个看介绍，也可以点“📍 在地图上看”飞过去。', peaks: true },
+    { id: 'route', label: '水库环线', nochip: true, kw: ['环线', '路线', '登山', '下山', '怎么走', '怎么玩', '行程', '徒步', '爬山'],
+      ans: '🗺️ 水库环线（全长约 2.1 公里，闭合环线）：\n· 登山路线：自水库北岸上归元峰，约 778 米\n· 下山路线：自归元峰下至东侧应急出口，约 833 米\n· 东侧返程：自应急出口连回水库北岸，约 536 米，园区出口在通道起点旁与村道交汇处\n登山线与下山线在归元峰交汇，三段闭合成环，不走回头路。' },
+    { id: 'hours', label: '开放时间', kw: ['时间', '几点', '开门', '关门', '开放', '营业', '晨爬', '日爬', '夕爬', '截止'],
+      ans: '🕗 开放时间 5:00–19:00，17:00 截止入园。\n· 晨爬 5:00–8:00\n· 日爬 8:00–15:00\n· 夕爬 15:00–17:00\n时间请以景区当日公示为准。' },
+    { id: 'ticket', label: '门票价格', kw: ['门票', '票价', '多少钱', '价格', '收费', '票', '优惠', '免费'],
+      ans: '🎫 门票价格以景区当日公示为准。\n可拨打景区咨询电话 <a href="tel:07716467699">0771-6467699</a> 确认。' },
+    { id: 'entrance', label: '登山入口', kw: ['入口', '进门', '从哪进', '起点', '广场', '集散'],
+      ans: '🚶 登山入口在水库北岸，是水库环线登山路线的起点。\n访客集散广场在入口旁（水库北岸公路旁），停车、集散、出发都在这里。\n<button class="mapbtn" data-lon="107.040649" data-lat="23.15863" data-size="9">📍 在地图上看</button>' },
+    { id: 'exit', label: '出口与应急', kw: ['出口', '出门', '应急', '安全', '迷路', '下山出口'],
+      ans: '🚪 园区出口在应急通道起点旁（下山路线终点附近），村道通往公路。\n🆘 应急出口在下山路线终点（原园区出口处）。如需帮助可拨打 <a href="tel:07716467699">0771-6467699</a>。' },
+    { id: 'lake', label: '伏曼水库', kw: ['水库', '伏曼', '湖', '水', '岛'],
+      ans: '💧 伏曼水库在景区东侧，湖面海拔约 497 米，湖心五岛，碧绿清透。登山入口就在水库北岸。\n<button class="mapbtn" data-lon="107.04537" data-lat="23.15256" data-size="12">📍 在地图上看</button>' },
+    { id: 'traffic', label: '交通自驾', kw: ['交通', '怎么去', '开车', '自驾', '导航', '地址', '在哪', '位置', '坐车', '打车'],
+      ans: '🚗 景区在广西崇左市天等县，导航“剑龙山景区”即可。' },
+    { id: 'phone', label: '咨询电话', kw: ['电话', '咨询', '联系', '客服', '预约'],
+      ans: '📞 景区咨询电话：<a href="tel:07716467699">0771-6467699</a>\n点号码可以直接拨打。票价、时间请以景区当日公示为准。' },
+    { id: 'intro', label: '景区简介', kw: ['简介', '介绍', '什么地方', '好玩吗', '怎么样', '剑龙山'],
+      ans: '⛰️ 剑龙山在广西崇左市天等县，四座板峰如剑龙背板般沿山脊排开，东侧是碧绿的伏曼水库。\n水库环线全长约 2.1 公里，自水库北岸出发，经归元峰环绕一圈回到起点。' },
+  ];
+  const CHAT_FALLBACK = '这个问题我还不太清楚，你可以点下面的快捷问题，或直接拨打景区咨询电话 <a href="tel:07716467699">0771-6467699</a>。';
+  const chatPanel = $('chatPanel'), chatMsgs = $('chatMsgs'), chatChips = $('chatChips'), chatInput = $('chatInput');
+  let chatOpened = false;
+  const chatScroll = () => { chatMsgs.scrollTop = chatMsgs.scrollHeight; };
+  function chatBubble(html, who) {
+    const d = document.createElement('div');
+    d.className = 'msg ' + who;
+    if (who === 'u') d.textContent = html; else d.innerHTML = html;
+    chatMsgs.appendChild(d); chatScroll();
+    return d;
+  }
+  function chatTyping() {
+    const d = document.createElement('div');
+    d.className = 'msg a typing';
+    d.innerHTML = '<i></i><i></i><i></i>';
+    chatMsgs.appendChild(d); chatScroll();
+    return d;
+  }
+  function chatReply(html, delay) {
+    const t = chatTyping();
+    setTimeout(() => { t.remove(); chatBubble(html, 'a'); }, delay || 700);
+  }
+  function chatPeakButtons() {
+    return '<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:6px">' +
+      DATA.chatPeaks.map((s) => '<button class="mapbtn" data-peak="' + s.name + '">' + s.name + ' ' + s.kmlH + 'm</button>').join('') +
+      '</div>';
+  }
+  function askTopic(id) {
+    const t = CHAT_TOPICS.find((x) => x.id === id);
+    if (!t) return;
+    chatBubble(t.label, 'u');
+    if (t.nearby) { chatReply(nearbyChatHtml()); return; }
+    if (t.peaks) chatReply(t.ans.replace(/\n/g, '<br>') + chatPeakButtons());
+    else chatReply(t.ans.replace(/\n/g, '<br>'));
+  }
+  function askPeak(name) {
+    const s = DATA.chatPeaks.find((x) => x.name === name);
+    if (!s) return;
+    chatBubble(name, 'u');
+    const p = DATA.peaks.find((x) => x.id === s.id);
+    const html = '<b>' + s.name + ' ' + s.kmlH + 'm</b><br>' + s.text +
+      '<br><button class="mapbtn" data-lon="' + p.lon + '" data-lat="' + p.lat + '" data-size="11">📍 在地图上看</button>';
+    chatReply(html);
+  }
+  function askText(q) {
+    const query = (q || '').trim();
+    if (!query) return;
+    chatBubble(query, 'u');
+    chatInput.value = '';
+    const peak = DATA.chatPeaks.find((s) => query.indexOf(s.name) !== -1);
+    if (peak) { askPeak(peak.name); return; }
+    const t = CHAT_TOPICS.find((x) => x.kw.some((k) => query.indexOf(k) !== -1));
+    if (t && t.nearby) { chatReply(nearbyChatHtml()); return; }
+    if (t && t.peaks) { chatReply(t.ans.replace(/\n/g, '<br>') + chatPeakButtons()); return; }
+    if (t) { chatReply(t.ans.replace(/\n/g, '<br>')); return; }
+    chatReply(CHAT_FALLBACK);
+  }
+  function openChat() {
+    closeAllOverlays();
+    chatPanel.hidden = false;
+    const dot = $('chatDot');
+    if (dot) dot.style.display = 'none';
+    const av = $('chatAvatar');
+    if (av && !av.src) loadPhotos().then((ph) => { if (ph.avatar) av.src = ph.avatar; });
+    if (!chatOpened) {
+      chatOpened = true;
+      chatReply('你好，我是景区小助理 ⛰️<br>可以点下面的问题，或直接打字问我四峰、环线、时间、门票。', 400);
+    }
+    chatScroll();
+  }
+  window.__openChat = openChat;
+  $('chatFab').addEventListener('click', () => { if (chatPanel.hidden) openChat(); else closeChat(); });
+  $('chatX').addEventListener('click', closeChat);
+  $('chatSend').addEventListener('click', () => askText(chatInput.value));
+  chatInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') askText(chatInput.value); });
+  CHAT_TOPICS.forEach((t) => {
+    if (t.nochip) return; // v2.10.3：“水库环线”没有快捷按钮，关键词仍可问
+    const b = document.createElement('button');
+    b.textContent = t.label;
+    b.addEventListener('click', () => askTopic(t.id));
+    chatChips.appendChild(b);
+  });
+  chatMsgs.addEventListener('click', (e) => {
+    const btn = e.target.closest('.mapbtn');
+    if (!btn) return;
+    if (btn.dataset.peak) { askPeak(btn.dataset.peak); return; }
+    if (btn.dataset.near) {
+      const s = DATA.nearby.find((x) => x.name === btn.dataset.near);
+      if (s) { closeChat(); nearbyOpenSpot(s); }
+      return;
+    }
+    if (btn.dataset.lon) {
+      closeChat();
+      labelsEnabled = true;
+      currentMainPeak = null;
+      const size = parseInt(btn.dataset.size || '11', 10);
+      fly(parseFloat(btn.dataset.lon), parseFloat(btn.dataset.lat), size * 80, -55);
+      setTimeout(declutterLabels, 1900);
+    }
+  });
+  // 点地图标记时收起聊天面板，免得两块面板叠在一起（showDetail 里 closeAllOverlays 已含）
+
+  // ---------- 点地图标记开弹窗；点空白处不关弹窗（只用 ✕ / 开别的浮层关） ----------
+  viewer.screenSpaceEventHandler.setInputAction((movement) => {
+    const picked = viewer.scene.pick(movement.position);
+    const target = picked && picked.id;
+    if (target && target._popup) {
+      const p = target._popup;
+      showDetail(p.title, p.meta, p.body, p.photo, null, p.fly);
+    }
+  }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+
+  // ---------- 四季按钮 ----------
+  const chipBox = $('seasonChips');
+  Object.entries(DATA.seasons).forEach(([id, s]) => {
+    const b = document.createElement('button');
+    b.className = 'chip'; b.dataset.season = id;
+    b.innerHTML = `<div class="t">${s.label}</div><div class="d">${s.chip}</div>`;
+    b.addEventListener('click', () => applySeason(id));
+    chipBox.appendChild(b);
+  });
+  // 景区介绍里的 logo 懒加载
+  const infoLogo = $('infoLogo');
+  if (infoLogo) {
+    const obs = new MutationObserver(() => {
+      if (!$('sheet-info').hidden && !infoLogo.src) {
+        loadPhotos().then((ph) => { if (ph.logo) infoLogo.src = ph.logo; });
+      }
+    });
+    obs.observe($('sheet-info'), { attributes: true, attributeFilter: ['hidden'] });
+  }
+
+  // ---------- 动画：徒步者 / 云 / 旗 / 雨 / GPS 脉冲（15fps，便宜） ----------
+  // 每 66ms 更新一次位置并请求一次渲染；静态时仍靠 requestRenderMode 省电，
+  // 但地图是“活”的（有人走、云在飘），所以持续以 15fps 渲染——手机上够用，
+  // 拖动时的 DPR 1.0 + msse 4 优化仍在。
+  let lastTick = Date.now();
+  function tick() {
+    const now = Date.now();
+    const dt = Math.min(0.1, (now - lastTick) / 1000);
+    lastTick = now;
+    const t = now / 1000;
+    const nVis = DATA.seasons[curSeason].hikers;
+    for (let i = 0; i < hikers.length; i++) {
+      const hk = hikers[i];
+      if (i >= nVis) { hk.board.show = false; if (hk.umb) hk.umb.show = false; continue; }
+      hk.s += hk.speed * dt;
+      if (hk.s >= loopTotal) hk.s -= loopTotal;
+      const p = pointAtLoop(hk.s);
+      hk.board.show = true;
+      hk.board.position = Cesium.Cartesian3.fromDegrees(p.lon, p.lat, p.h);
+      if (hk.umb) {
+        hk.umb.show = (curSeason === 'rain');
+        hk.umb.position = Cesium.Cartesian3.fromDegrees(p.lon, p.lat, p.h + 7);
+      }
+    }
+    for (const c of cloudEnts) {
+      c.x += c.def.v * c.dir * dt;
+      if (c.x > c.def.ampM) { c.x = c.def.ampM; c.dir = -1; }
+      else if (c.x < -c.def.ampM) { c.x = -c.def.ampM; c.dir = 1; }
+      const lon = c.def.lon + c.x / 102000;
+      c.puffs.forEach((ent, j) => {
+        const pf = c.def.puffs[j];
+        ent.position = Cesium.Cartesian3.fromDegrees(lon + pf.dLon, c.def.lat + pf.dLat, c.def.h + pf.dH);
+      });
+    }
+    for (const f of flagBoxes) {
+      const h = 0.26 * Math.sin(t * 0.9 + f.phase); // ±15° 慢摆
+      const pos = Cesium.Cartesian3.fromDegrees(
+        f.peak.lon + Math.cos(h) * 10 / 102000,
+        f.peak.lat + Math.sin(h) * 10 / 111000,
+        f.peak.gridH + 24);
+      f.entity.position = pos;
+      f.entity.orientation = Cesium.Transforms.headingPitchRollQuaternion(pos, new Cesium.HeadingPitchRoll(h, 0, 0));
+    }
+    if (curSeason === 'rain') {
+      for (const r of rainStreaks) {
+        r.y -= 40 * dt;
+        if (r.y < r.groundH) r.y = r.groundH + 150 + Math.random() * 50;
+        r.board.position = Cesium.Cartesian3.fromDegrees(r.lon, r.lat, r.y);
+      }
+    }
+    if (geoPulseEnt && geoPulseEnt.show) {
+      const pt = (Date.now() % 1600) / 1600;
+      const r = geoAccR * (1 + 1.4 * pt);
+      geoPulseEnt.ellipse.semiMajorAxis = r;
+      geoPulseEnt.ellipse.semiMinorAxis = r;
+      try { geoPulseEnt.ellipse.material.color.setValue(new Cesium.Color(0.18, 0.48, 1.0, 0.5 * (1 - pt))); } catch (e) { /* 忽略 */ }
+    }
+    viewer.scene.requestRender();
+  }
 
   // 初始视角：全景（瞬时，不用 fly 动画）
   viewer.camera.setView({
@@ -340,7 +1294,9 @@ try {
     orientation: { heading: 0, pitch: D2R(-55), roll: 0 },
   });
   window.__view = '全景';
+  applySeason('spring'); // 建树 + 雾密度（默认春）
   declutterLabels();
+  setInterval(tick, 66);
 
   // ---------- 诊断信息（给探针用） ----------
   window.__diag = {
@@ -352,13 +1308,18 @@ try {
     dprCap,
     maxScreenSpaceError: viewer.scene.globe.maximumScreenSpaceError,
     fogEnabled: viewer.scene.fog.enabled,
+    fogDensity: viewer.scene.fog.density,
     skyAtmosphere: viewer.scene.skyAtmosphere.show,
     maxZoomDistance: viewer.scene.screenSpaceCameraController.maximumZoomDistance,
-    imageryRectangle: [106.50, 22.65, 107.58, 23.65],
+    imageryRectangle: [106.78, 22.92, 107.29, 23.39],
     peaks: DATA.peaks.map((p) => ({ short: p.short, kmlH: p.kmlH, gridH: p.gridH })),
+    ground: groundStats,
+    season: curSeason,
+    labels: labelItems.length,
+    loopTotalM: Math.round(loopTotal),
   };
   setStatus('就绪：地形 + 影像 + 标注');
-  log('就绪，实体数 ' + viewer.entities.values.length);
+  log('就绪，实体数 ' + viewer.entities.values.length + '，标签 ' + labelItems.length + '，环线 ' + Math.round(loopTotal) + 'm');
   window.__ready = true;
 } catch (e) {
   window.__error = String((e && e.stack) || e);

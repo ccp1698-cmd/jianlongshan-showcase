@@ -221,7 +221,7 @@ a{color:#9fc6a8;text-underline-offset:2px}
     <b>四季</b> —— 崇左属亚热带湿润季风区，年均 21–22℃，无霜期 330 天以上，年雨量约 1200 mm，雨季 4–9 月占全年近八成，春季多干旱：这里是“长夏无冬、四季常青”，所以不用温带春夏秋冬。<a href="https://www.weather.com.cn/cityintro/101300201.shtml" target="_blank" rel="noopener">中国天气网 · 崇左城市介绍 ↗</a><br>
   </div>
   <div class="foot">
-    地形：SRTM / Terrarium DEM · 山路：© OpenStreetMap contributors (ODbL) · 画风与结构：Pocket City Skill（April Zhu，MIT）· 树木放大 ×4 以便看清 · 山脊最高 730 m（天柱峰）· 微缩模型 v2.11.1 · <span>3D 模型：Polyfork（CC BY 4.0）</span> <button id="attrToggle" type="button">查看完整署名</button>
+    地形：SRTM / Terrarium DEM · 山路：© OpenStreetMap contributors (ODbL) · 画风与结构：Pocket City Skill（April Zhu，MIT）· 树木放大 ×4 以便看清 · 山脊最高 730 m（天柱峰）· 微缩模型 v2.11.2 · <span>3D 模型：Polyfork（CC BY 4.0）</span> <button id="attrToggle" type="button">查看完整署名</button>
     <div id="attrFull" hidden>3D 模型（CC BY 4.0）：Rammed-Earth Farmhouse by Polyfork (https://polyfork.dev/asset/rammed-earth-farmhouse-6432fc), CC BY 4.0；Gabled Farmhouse by Polyfork (https://polyfork.dev/asset/gabled-farmhouse-c7534f), CC BY 4.0；Thatched Cottage by Polyfork (https://polyfork.dev/asset/thatched-cottage-0e63f5), CC BY 4.0；Log Cabin by Polyfork (https://polyfork.dev/asset/log-cabin-4fac3b), CC BY 4.0；Timber Barn by Polyfork (https://polyfork.dev/asset/timber-barn-90b3ce), CC BY 4.0；Market Stall by Polyfork (https://polyfork.dev/asset/market-stall-9d0b29), CC BY 4.0；Town Car by Polyfork (https://polyfork.dev/asset/town-car-56eeb6), CC BY 4.0；Scout Jeep by Polyfork (https://polyfork.dev/asset/scout-jeep-c02efe), CC BY 4.0；Family Minivan by Polyfork (https://polyfork.dev/asset/family-minivan-924de0), CC BY 4.0；Horse by Polyfork (https://polyfork.dev/asset/horse-base), CC BY 4.0；Cow by Polyfork (https://polyfork.dev/asset/cow-base), CC BY 4.0；Sheep by Polyfork (https://polyfork.dev/asset/sheep-base), CC BY 4.0；Red Fox by Polyfork (https://polyfork.dev/asset/red-fox-5c3bc0), CC BY 4.0；Wooden Rowboat by Polyfork (https://polyfork.dev/asset/wooden-rowboat-916981), CC BY 4.0；Dock Platform Section by Polyfork (https://polyfork.dev/asset/dock-platform-section-b36e7c), CC BY 4.0；Trail Signpost by Polyfork (https://polyfork.dev/asset/trail-signpost-bd29a7), CC BY 4.0</div>
   </div>
 </div>
@@ -1287,6 +1287,11 @@ const parkedCarSpots=[];
 /* ---------- peaks: poles, flags, markers ---------- */
 const markers=[];
 const viewMarkers={};
+// v2.11.2: L2 stagger counter — the 18 L2 markers (12 waypoints, then
+// 3 parking, then 3 facilities, in creation order) alternate -10 / +10
+// px vertically, so neighbouring L2 pills separate instead of stacking.
+// L1 markers get _stag 0 (pinned directly above their point, untouched).
+let _l2StagN=0;
 function addMarker(lon,lat,yOff,html,cls,onClick,off){
   const [x,z]=sceneOf(lon,lat); const y=yOf(demAt(lon,lat));
   const el=document.createElement('div'); el.className='marker '+cls; el.innerHTML=html;
@@ -1305,7 +1310,9 @@ function addMarker(lon,lat,yOff,html,cls,onClick,off){
   // v2.11.1: the initial opacity is the distance factor when visible
   // (distOpacity is a hoisted function declaration, so it is callable
   // here even though it is defined below with fadeMarker).
-  el.style.opacity=_hidTier?'0':String(distOpacity()); el.style.pointerEvents=_hidTier?'none':'auto';
+  // v2.11.2: L1 is fully opaque now (no distance fade — user: "一级按钮
+  // 标注去掉透明效果"); the distance factor applies to L2 only.
+  el.style.opacity=_hidTier?'0':(cls.indexOf('lv2')>=0?String(distOpacity()):'1'); el.style.pointerEvents=_hidTier?'none':'auto';
   // v2.10: vertical stagger CANCELLED (user: "取消垂直错开") — the v2.9.9
   // off.stag fixed-pixel offsets and the 1 px leader lines are gone; every
   // label anchors directly above its point again (yOff lift only, dx/dy 0).
@@ -1330,7 +1337,13 @@ function addMarker(lon,lat,yOff,html,cls,onClick,off){
     // v2.11.1: _vis mirrors the tier/occlusion decision (set by
     // fadeMarker, initialised here) — the per-frame loop in
     // updateMarkers reads it to retarget the distance opacity.
-    isL2:cls.indexOf('lv2')>=0,_vis:!_hidTier});
+    // v2.11.2: _stag is the L2 stagger offset (fixed pixels, applied to
+    // the pill's screen y in updateMarkers; the anchor itself never
+    // moves). L2 alternates -10 / +10 in creation order (waypoints in
+    // trail order, then parking, then facilities — neighbours on the
+    // trail are neighbours on screen, so they split apart); L1 is 0.
+    isL2:cls.indexOf('lv2')>=0,_vis:!_hidTier,
+    _stag:cls.indexOf('lv2')>=0?(_l2StagN++%2===0?-10:10):0});
   return el;
 }
 const flags=[]; // v2.9.9: waving summit flags {mesh, base positions, phase}
@@ -2004,6 +2017,9 @@ let _mkSnap=null;
 // The factor is a pure function of size (no per-marker state), so it
 // composes with the tier fade by multiplication: visible = dist, hidden
 // = 0. It never changes pointer-events (opacity alone never blocks a tap).
+// v2.11.2: the distance factor applies to L2 ONLY now — L1 markers are
+// always fully opaque (user: "一级按钮标注去掉透明效果"); see fadeMarker
+// and the per-frame retarget in updateMarkers.
 function distOpacity(){
   const s=camState.size;
   if(s<=12)return 1;
@@ -2017,9 +2033,11 @@ function distOpacity(){
 // when hidden; m._vis records the tier/occlusion decision so the
 // per-frame loop in updateMarkers can retarget the distance opacity
 // every frame (even mid-pinch — see below).
+// v2.11.2: L1 is fully opaque (target '1'); only L2 takes the distance
+// factor (user: "一级按钮标注去掉透明效果").
 function fadeMarker(m,show){
   m._vis=show;
-  if(show){m.el.style.opacity=String(distOpacity());m.el.style.pointerEvents='auto';}
+  if(show){m.el.style.opacity=m.isL2?String(distOpacity()):'1';m.el.style.pointerEvents='auto';}
   else{m.el.style.opacity='0';m.el.style.pointerEvents='none';}
 }
 // v2.10.6: terrain-occlusion state, refreshed throttled (see
@@ -2113,8 +2131,10 @@ function updateMarkers(){
     // instead of jumping at release — that is the "拉近逐渐变不透明"
     // the user asked for. Writing the target every frame just retargets
     // the CSS .18s transition (same as the tier fade always did); a
-    // hidden marker (m._vis false) keeps opacity 0 and is never written.
-    if(m._vis)m.el.style.opacity=String(distOpacity());
+    // v2.11.2: L1 retargets to '1' (no distance fade); L2 follows the
+    // distance factor. A hidden marker (m._vis false) keeps opacity 0
+    // and is never written.
+    if(m._vis)m.el.style.opacity=m.isL2?String(distOpacity()):'1';
     // v2.9.4: peak labels anchor to the FLAG TOP (m.top), not the summit — the
     // label's bottom edge sits a fixed 13 px above the projected flag top, so it
     // stays glued above its own red flag at every zoom and elevation. (The old
@@ -2139,8 +2159,13 @@ function updateMarkers(){
     // transform (the CSS .marker transform is removed).
     // v2.10: stagger cancelled — no sx/sy offsets, no leader lines; the
     // label sits directly above its anchor (dx/dy + lift only).
+    // v2.11.2: L2-ONLY exception, user-ordered ("把地图的二级按钮标注改成
+    // 错开布局") — a fixed ±10 px vertical stagger on the pill's screen
+    // y (m._stag, assigned in addMarker, alternating in creation order).
+    // The ANCHOR never moves (the PIN probes measure anchor + _stag);
+    // L1 keeps _stag 0, i.e. still pinned directly above its point.
     const lx0=(v3.x*0.5+0.5)*w+(m.dx||0)*s;
-    const ly=(-v3.y*0.5+0.5)*h+(m.dy||0)*s-liftPx;
+    const ly=(-v3.y*0.5+0.5)*h+(m.dy||0)*s-liftPx+(m._stag||0);
     // v2.10.14: NO pole nudge, NO shift of any kind — the v2.10.10 pole
     // clearance is deleted (see above): the pill centre is the anchor
     // (lx0), directly above its point. 脊生扶桑 sits 7 m from the 初脊峰

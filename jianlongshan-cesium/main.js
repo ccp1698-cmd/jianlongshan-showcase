@@ -66,13 +66,39 @@ try {
   // ArcGIS API key：公开应用 key，随页面代码下发（靠来源网址 Referrer 限制保护，
   // 不靠保密）。只放这一处；不要抄到报告、日志或 BUILD-NOTES 里。
   const ARCGIS_API_KEY = 'AAPTa3ElsJROTHE12I328JVC1Wg..9c7pYJs-60w4T61Mq5pLtKb5fTO1Gm2XsgUXiLmIfDDjk_ObQQjqo7dBjmST0Y9HFTE-8eBGWLqSTR1gUJq5Q8JYd0hzudDv216YhlbRLesURM6a_7BayGrrPFyiNkEhLGI-XQxNdDshn_9CpPEiNq4-qFXwFh_iK4Mq5gGDqyeFycgmqyZ1EYjxwp2Wpmvv8YxFyU2pSsXqAi5KaKNEsVv13OtsceOHSKfvM9rzhAT5jMoyMjzu0-k.AT1_JCyw5th4';
-  const imageryLayer = new Cesium.ImageryLayer(new Cesium.UrlTemplateImageryProvider({
-    url: 'https://ibasemaps-api.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}?token=' + ARCGIS_API_KEY,
-    maximumLevel: isNarrow ? 15 : 18, // 窄屏少拉高倍瓦片，省显存和流量；宽屏仍 18
+  // ---------- 底图风格（4 种，点着换） ----------
+  // 卫星走带 key 的 ibasemaps World_Imagery（已验证 200 + 真 JPEG）；
+  // 地形/街道/深灰走 ArcGIS 静态底图切片服务（官方文档的对等服务——
+  // ibasemaps 主机上只有 World_Imagery，World_Topo_Map 等服务名在那返回 404；
+  // 服务自带的 /self 列表确认地形对应 arcgis/outdoor，街道 arcgis/streets，
+  // 深灰 arcgis/dark-gray，均已验证 200 + 真 PNG）。静态切片是 512×512 PNG，
+  // provider 要设 tileWidth/tileHeight 512；卫星是 256×256 JPEG。
+  // 4 种风格共用同一个 ARCGIS_API_KEY；影像矩形与 Esri 署名与之前一致。
+  const BASEMAPS = [
+    { id: 'imagery', name: '卫星', chip: '真实卫星影像', note: 'Esri 卫星影像（默认，真实感最强）。', url: 'https://ibasemaps-api.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}?token=' + ARCGIS_API_KEY, tileSize: 256 },
+    { id: 'outdoor', name: '地形', chip: '地形 · 等高线 · 水系', note: 'ArcGIS Outdoor：地形、等高线、山脊水系，适合看地形。', url: 'https://static-map-tiles-api.arcgis.com/arcgis/rest/services/static-basemap-tiles-service/v1/arcgis/outdoor/static/tile/{z}/{y}/{x}?token=' + ARCGIS_API_KEY, tileSize: 512 },
+    { id: 'streets', name: '街道', chip: '道路 · 村庄 · 建筑', note: 'ArcGIS Streets：道路、村庄、建筑，适合看路网。', url: 'https://static-map-tiles-api.arcgis.com/arcgis/rest/services/static-basemap-tiles-service/v1/arcgis/streets/static/tile/{z}/{y}/{x}?token=' + ARCGIS_API_KEY, tileSize: 512 },
+    { id: 'dark', name: '深灰', chip: '深色底图，标注醒目', note: 'ArcGIS Dark Gray：深色底图，路线和标注更醒目。', url: 'https://static-map-tiles-api.arcgis.com/arcgis/rest/services/static-basemap-tiles-service/v1/arcgis/dark-gray/static/tile/{z}/{y}/{x}?token=' + ARCGIS_API_KEY, tileSize: 512 },
+  ];
+  // 底图选择持久化：localStorage，下次打开恢复上次的风格（与视角记忆同一套做法；
+  // 视角记忆只在窄屏，底图选择是用户偏好，宽屏窄屏都存取）。
+  const BASEMAP_KEY = 'jls-cesium-basemap-v1';
+  const readSavedBasemap = () => {
+    try {
+      const id = localStorage.getItem(BASEMAP_KEY);
+      return BASEMAPS.some((b) => b.id === id) ? id : 'imagery';
+    } catch (e) { return 'imagery'; }
+  };
+  let curBasemap = readSavedBasemap();
+  const makeImageryProvider = (style) => new Cesium.UrlTemplateImageryProvider({
+    url: style.url,
+    tileWidth: style.tileSize, tileHeight: style.tileSize,
+    maximumLevel: isNarrow ? 15 : 18, // 窄屏少拉高倍瓦片，省显存和流量；宽屏仍 18（换底图后同样生效）
     // 影像只拉 20km 范围矩形（覆盖地形外层框 + 余量），别全 globe 拉瓦片
     rectangle: Cesium.Rectangle.fromDegrees(106.78, 22.92, 107.29, 23.39),
     credit: 'Esri, Maxar, Earthstar Geographics',
-  }));
+  });
+  let imageryLayer = new Cesium.ImageryLayer(makeImageryProvider(BASEMAPS.find((b) => b.id === curBasemap)));
   const viewer = new Cesium.Viewer('cesiumContainer', {
     terrainProvider,
     baseLayer: imageryLayer,
@@ -856,6 +882,7 @@ try {
     { label: '🍂 四季', sheet: 'seasons' },
     { label: '🗺 图例', sheet: 'legend' },
     { label: 'ⓘ 景区介绍', sheet: 'info' },
+    { label: '🗺️ 底图', sheet: 'basemap' },
   ];
   for (const f of funcBtns) {
     const b = document.createElement('button');
@@ -894,7 +921,7 @@ try {
     closeAllOverlays();
     if (wasHidden) {
       sh.hidden = false;
-      const btn = [...document.querySelectorAll('#views button.func')].find((b) => b.textContent.includes({ seasons: '四季', legend: '图例', info: '景区介绍', nearby: '附近' }[id] || ''));
+      const btn = [...document.querySelectorAll('#views button.func')].find((b) => b.textContent.includes({ seasons: '四季', legend: '图例', info: '景区介绍', nearby: '附近', basemap: '底图' }[id] || ''));
       if (btn) btn.classList.add('on');
       if (id === 'nearby') { nearbyRender(); $('nearbyBtn')?.classList.add('on'); }
     }
@@ -1233,6 +1260,39 @@ try {
     b.addEventListener('click', () => applySeason(id));
     chipBox.appendChild(b);
   });
+  // ---------- 底图切换：只换影像层，相机/路线/标注/地形/树/云雾/季节全不动 ----------
+  // 切完视角保持原地（不碰相机）；当前风格存 localStorage，下次打开恢复。
+  function setBasemap(id) {
+    const style = BASEMAPS.find((b) => b.id === id);
+    if (!style) return;
+    if (style.id !== curBasemap) {
+      const next = new Cesium.ImageryLayer(makeImageryProvider(style));
+      viewer.imageryLayers.remove(imageryLayer, true);
+      viewer.imageryLayers.add(next);
+      imageryLayer = next;
+      curBasemap = style.id;
+      try { localStorage.setItem(BASEMAP_KEY, curBasemap); } catch (e) { /* 隐私模式等写失败就跳过 */ }
+      log('底图：' + style.name);
+    }
+    document.querySelectorAll('#basemapChips .chip').forEach((b) => b.classList.toggle('on', b.dataset.basemap === curBasemap));
+    const note = $('basemapNote');
+    if (note) note.textContent = style.note;
+    window.__basemap = curBasemap;
+    if (window.__diag) { window.__diag.basemap = curBasemap; window.__diag.imageryMaxLevel = imageryLayer.imageryProvider.maximumLevel; }
+    viewer.scene.requestRender();
+  }
+  window.__setBasemap = setBasemap;
+  window.__basemap = curBasemap;
+  window.__basemaps = BASEMAPS.map((b) => b.id);
+  const basemapBox = $('basemapChips');
+  BASEMAPS.forEach((s) => {
+    const b = document.createElement('button');
+    b.className = 'chip'; b.dataset.basemap = s.id;
+    b.innerHTML = `<div class="t">${s.name}</div><div class="d">${s.chip}</div>`;
+    b.addEventListener('click', () => setBasemap(s.id));
+    basemapBox.appendChild(b);
+  });
+  setBasemap(curBasemap); // 只刷 chips 高亮 + 备注，不重建图层（图层已按保存的风格建好）
   // 景区介绍里的 logo 懒加载
   const infoLogo = $('infoLogo');
   if (infoLogo) {
@@ -1401,6 +1461,7 @@ try {
     tileCacheSize: viewer.scene.globe.tileCacheSize,
     maxRequestsPerServer: Cesium.RequestScheduler.maximumRequestsPerServer,
     imageryMaxLevel: viewer.scene.imageryLayers.get(0).imageryProvider.maximumLevel,
+    basemap: curBasemap,
     restMsse: REST_MSSE,
     isNarrow,
     imageryRectangle: [106.78, 22.92, 107.29, 23.39],

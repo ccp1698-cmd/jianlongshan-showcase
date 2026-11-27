@@ -233,7 +233,7 @@ a{color:#9fc6a8;text-underline-offset:2px}
     <b>四季</b> —— 崇左属亚热带湿润季风区，年均 21–22℃，无霜期 330 天以上，年雨量约 1200 mm，雨季 4–9 月占全年近八成，春季多干旱：这里是“长夏无冬、四季常青”，所以不用温带春夏秋冬。<a href="https://www.weather.com.cn/cityintro/101300201.shtml" target="_blank" rel="noopener">中国天气网 · 崇左城市介绍 ↗</a><br>
   </div>
   <div class="foot">
-    地形：SRTM / Terrarium DEM · 山路：© OpenStreetMap contributors (ODbL) · 树木放大 ×4 以便看清 · 山脊最高 730 m（天柱峰）· 微缩模型 v2.11.24 · <span>3D 模型：Polyfork（CC BY 4.0）</span>
+    地形：SRTM / Terrarium DEM · 山路：© OpenStreetMap contributors (ODbL) · 树木放大 ×4 以便看清 · 山脊最高 730 m（天柱峰）· 微缩模型 v2.11.25 · <span>3D 模型：Polyfork（CC BY 4.0）</span>
   </div>
 </div>
 <div class="sheet" id="sheet-info" hidden>
@@ -1944,6 +1944,11 @@ document.getElementById('locateBtn').addEventListener('click',()=>{if(geoWatch!=
    notes footer. Pinch zoom at a size clamp no longer pans the
    view: the anchor uses the achieved ratio (as the wheel handler
    does), so at size 5 or 85 the anchor term is 0.
+   v2.11.25: one-finger drag slows further below size 12 (user
+   2026-11-27 21:23, still too fast after zooming in): the rate
+   now falls off quadratically there (size squared over 35*12),
+   so close-up terrain stops sweeping past; size 12 and above
+   are unchanged.
    伏那秘境 coordinates are REAL since v2.11.7 (107.02, 22.86 —
    zjv.cn 崇左本地事实库 GEO 问答卡, 2026-11-09; sources: 广西
    文化和旅游厅 / 大新县文旅部门 / 恩城国家级自然保护区; only
@@ -2217,7 +2222,14 @@ let dragging=false; // v2.10.9: single-finger drag active — tick() damps az/el
         // zone are unchanged. (First done in v2.10.13, lost in the
         // v2.10.13 rollback; v2.10.14 did not carry it over; the user
         // asked again 2026-11-26 14:59: "近景的时候滑到速度太快了".)
-        const _dk=camGoal.size/35;
+        // Measured again at max zoom: the peaks are equalized by the
+        // size/35 scaling, but the near ground still sweeps past —
+        // terrain V 52 px vs 22 px panorama per 100 px drag at size 5.
+        // Below size 12 the rate falls off quadratically (an extra
+        // size/12 factor), so close-up terrain slows to panorama
+        // speed; size 12 and above are unchanged. Pan, pinch, wheel,
+        // twist, damping and the el clamp are untouched.
+        const _dk=camGoal.size/35*Math.min(1,camGoal.size/12);
         camGoal.az=dragBase.az-tdx*0.00628*_dk;  // right drag -> yaw decreases (same direction as the original)
         camGoal.el=Math.min(1.29,Math.max(0.10,dragBase.el+tdy*0.00384*_dk));  // down drag -> el up (toward top-down)
       }

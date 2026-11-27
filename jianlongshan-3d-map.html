@@ -48,7 +48,8 @@ a{color:#9fc6a8;text-underline-offset:2px}
 .topbar>*{pointer-events:auto}
 .topinfo{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
 .pill{background:rgba(18,24,18,.72);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,.28);border-radius:999px;color:#f2ede0;padding:6px 12px;font-size:12px;font-weight:700;box-shadow:0 2px 10px rgba(0,0,0,.25);white-space:nowrap}
-.pill.title{font:700 15px/1.2 var(--serif);color:var(--gold);letter-spacing:.02em}
+.pill.title{font:700 15px/1.2 var(--serif);color:var(--gold);letter-spacing:.02em;animation:titlePulse 2s ease-in-out infinite} /* v2.11.26: deliberate gentle flash — the user wants the title pill to flash ("我的意思是让他闪"); same soft gold ring pattern as .locbtn locPulse; blur, background, border and text unchanged */
+@keyframes titlePulse{0%,100%{box-shadow:0 2px 10px rgba(0,0,0,.25),0 0 0 0 rgba(232,185,35,.30)}50%{box-shadow:0 2px 10px rgba(0,0,0,.25),0 0 0 5px rgba(232,185,35,0)}}
 .pill.logo{padding:0;display:flex;align-items:center;background:transparent;border:none;box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none}
 .pill.logo img{height:40px;width:auto;display:block}
 .sheet .biglogo{display:block;margin:2px auto 12px;height:140px;width:auto}
@@ -59,7 +60,7 @@ a{color:#9fc6a8;text-underline-offset:2px}
   /* v2.10.3: locate button — first in the group, slow pulse, icon + text */
   .locbtn{width:auto;padding:0 12px;border-radius:999px;font-size:13px;font-weight:400;-webkit-text-stroke:0;gap:5px;animation:locPulse 2s ease-in-out infinite}
   @keyframes locPulse{0%,100%{box-shadow:0 2px 10px rgba(0,0,0,.25),0 0 0 0 rgba(232,185,35,.35)}50%{box-shadow:0 2px 10px rgba(0,0,0,.25),0 0 0 6px rgba(232,185,35,0)}}
-  .pill.title.on{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold)} /* v2.10.3: title pill is the nearby entry — gold while its panel is open */
+  .pill.title.on{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold);animation:none} /* v2.10.3: title pill is the nearby entry — gold while its panel is open; v2.11.26: the pulse stops while the panel is already open */
 /* hint line, auto-fades */
 .hint{position:fixed;left:50%;top:56px;transform:translateX(-50%);z-index:4;pointer-events:none;transition:opacity 1s}
 .hint span{background:rgba(18,24,18,.66);border:1px solid rgba(255,255,255,.22);border-radius:999px;padding:4px 12px;font-size:11px;color:#d8e2cc;white-space:nowrap}
@@ -233,7 +234,7 @@ a{color:#9fc6a8;text-underline-offset:2px}
     <b>四季</b> —— 崇左属亚热带湿润季风区，年均 21–22℃，无霜期 330 天以上，年雨量约 1200 mm，雨季 4–9 月占全年近八成，春季多干旱：这里是“长夏无冬、四季常青”，所以不用温带春夏秋冬。<a href="https://www.weather.com.cn/cityintro/101300201.shtml" target="_blank" rel="noopener">中国天气网 · 崇左城市介绍 ↗</a><br>
   </div>
   <div class="foot">
-    地形：SRTM / Terrarium DEM · 山路：© OpenStreetMap contributors (ODbL) · 树木放大 ×4 以便看清 · 山脊最高 730 m（天柱峰）· 微缩模型 v2.11.25 · <span>3D 模型：Polyfork（CC BY 4.0）</span>
+    地形：SRTM / Terrarium DEM · 山路：© OpenStreetMap contributors (ODbL) · 树木放大 ×4 以便看清 · 山脊最高 730 m（天柱峰）· 微缩模型 v2.11.26 · <span>3D 模型：Polyfork（CC BY 4.0）</span>
   </div>
 </div>
 <div class="sheet" id="sheet-info" hidden>
@@ -2092,6 +2093,7 @@ let dragging=false; // v2.10.9: single-finger drag active — tick() damps az/el
   const pts=new Map(); let pinchD=0, pinchA=null, pA=null, pB=null;
   let pinchMidX=0, pinchMidY=0; // v2.10.9: pinch midpoint at the last move — the two-finger drag pans by its delta
   let dragBase=null; // v2.10.9: drag-start baseline {x,y,az,el} (Pocket City resetTouch)
+  let tapStart=null; // v2.11.26: tap on empty canvas closes the open detail popup — baseline {x,y,t}; a drag (10 px+) or a pinch must not close it (see pointerdown / pointermove / end)
   // move the map content by (dxPx,dyPx) screen pixels (content follows the finger)
   // — returns the world-space [dtx,dtz] for the given camera state (no mutation)
   function panDelta(dxPx,dyPx,st){
@@ -2141,8 +2143,10 @@ let dragging=false; // v2.10.9: single-finger drag active — tick() damps az/el
       // drag that starts mid-glide doesn't jump.
       dragBase={x:e.clientX,y:e.clientY,az:camGoal.az,el:camGoal.el};
       dragging=true;
+      tapStart={x:e.clientX,y:e.clientY,t:performance.now()}; // tap candidate — a tap on empty canvas closes the open detail popup
     }
     if(pts.size===2){
+      tapStart=null; // second finger: it is a pinch, not a tap
       dragging=false; // the second finger turns the drag into a pinch
       for(const p of pts.values()){if(p!==pt){pA=p;break;}}
       pB=pt;
@@ -2163,6 +2167,7 @@ let dragging=false; // v2.10.9: single-finger drag active — tick() damps az/el
   canvas.addEventListener('pointermove',e=>{
     const cur=pts.get(e.pointerId);
     if(!cur)return;
+    if(tapStart&&Math.hypot(e.clientX-tapStart.x,e.clientY-tapStart.y)>=10)tapStart=null; // moved 10 px or more — a drag, not a tap
     cur.x=e.clientX; cur.y=e.clientY; // mutate in place — no allocation
     if(pinching&&pA&&pB){
       const d=Math.hypot(pA.x-pB.x,pA.y-pB.y);
@@ -2256,6 +2261,19 @@ let dragging=false; // v2.10.9: single-finger drag active — tick() damps az/el
         dragging=true;
       } else {
         dragging=false;
+        // tap on empty canvas closes the open detail popup (same
+        // close as the X: detail.hidden=true). Only a real tap
+        // counts: one pointer, <10 px movement, <400 ms. Taps on
+        // marker pills, the popup, the top bar and the dock never
+        // reach this canvas handler, so they are unaffected; a drag
+        // clears tapStart in pointermove and a pinch clears it at
+        // the second pointerdown, so neither can close the popup.
+        // pointercancel does not close.
+        if(e.type==='pointerup'&&tapStart&&performance.now()-tapStart.t<400&&Math.hypot(e.clientX-tapStart.x,e.clientY-tapStart.y)<10){
+          const _d=document.getElementById('detail');
+          if(_d&&!_d.hidden)_d.hidden=true;
+        }
+        tapStart=null;
       }
     }
     else if(pinching){

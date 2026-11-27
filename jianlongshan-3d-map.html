@@ -109,8 +109,6 @@ a{color:#9fc6a8;text-underline-offset:2px}
 .field{font-size:12.5px;line-height:1.7;color:#d8e2cc}
 .field b{color:#f2ede0}
 .foot{font-size:11px;color:#9fb098;line-height:1.7;border-top:1px dashed rgba(255,255,255,.25);margin-top:14px;padding-top:10px}
-#attrToggle{background:none;border:0;padding:0;font:inherit;color:#d8e2cc;text-decoration:underline;cursor:pointer}
-#attrFull{margin-top:6px}
 /* marker detail card */
 .detail{position:fixed;right:12px;bottom:64px;width:260px;background:rgba(20,26,20,.90);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.24);border-radius:14px;box-shadow:0 10px 32px rgba(0,0,0,.45);padding:12px 14px;z-index:7;color:#f2ede0}
 .detail[hidden]{display:none}
@@ -235,8 +233,7 @@ a{color:#9fc6a8;text-underline-offset:2px}
     <b>四季</b> —— 崇左属亚热带湿润季风区，年均 21–22℃，无霜期 330 天以上，年雨量约 1200 mm，雨季 4–9 月占全年近八成，春季多干旱：这里是“长夏无冬、四季常青”，所以不用温带春夏秋冬。<a href="https://www.weather.com.cn/cityintro/101300201.shtml" target="_blank" rel="noopener">中国天气网 · 崇左城市介绍 ↗</a><br>
   </div>
   <div class="foot">
-    地形：SRTM / Terrarium DEM · 山路：© OpenStreetMap contributors (ODbL) · 树木放大 ×4 以便看清 · 山脊最高 730 m（天柱峰）· 微缩模型 v2.11.23 · <span>3D 模型：Polyfork（CC BY 4.0）</span> <button id="attrToggle" type="button">查看完整署名</button>
-    <div id="attrFull" hidden>3D 模型（CC BY 4.0）：Rammed-Earth Farmhouse by Polyfork (https://polyfork.dev/asset/rammed-earth-farmhouse-6432fc), CC BY 4.0；Gabled Farmhouse by Polyfork (https://polyfork.dev/asset/gabled-farmhouse-c7534f), CC BY 4.0；Thatched Cottage by Polyfork (https://polyfork.dev/asset/thatched-cottage-0e63f5), CC BY 4.0；Log Cabin by Polyfork (https://polyfork.dev/asset/log-cabin-4fac3b), CC BY 4.0；Timber Barn by Polyfork (https://polyfork.dev/asset/timber-barn-90b3ce), CC BY 4.0；Market Stall by Polyfork (https://polyfork.dev/asset/market-stall-9d0b29), CC BY 4.0；Town Car by Polyfork (https://polyfork.dev/asset/town-car-56eeb6), CC BY 4.0；Scout Jeep by Polyfork (https://polyfork.dev/asset/scout-jeep-c02efe), CC BY 4.0；Family Minivan by Polyfork (https://polyfork.dev/asset/family-minivan-924de0), CC BY 4.0；Horse by Polyfork (https://polyfork.dev/asset/horse-base), CC BY 4.0；Cow by Polyfork (https://polyfork.dev/asset/cow-base), CC BY 4.0；Sheep by Polyfork (https://polyfork.dev/asset/sheep-base), CC BY 4.0；Red Fox by Polyfork (https://polyfork.dev/asset/red-fox-5c3bc0), CC BY 4.0；Wooden Rowboat by Polyfork (https://polyfork.dev/asset/wooden-rowboat-916981), CC BY 4.0；Dock Platform Section by Polyfork (https://polyfork.dev/asset/dock-platform-section-b36e7c), CC BY 4.0；Trail Signpost by Polyfork (https://polyfork.dev/asset/trail-signpost-bd29a7), CC BY 4.0</div>
+    地形：SRTM / Terrarium DEM · 山路：© OpenStreetMap contributors (ODbL) · 树木放大 ×4 以便看清 · 山脊最高 730 m（天柱峰）· 微缩模型 v2.11.24 · <span>3D 模型：Polyfork（CC BY 4.0）</span>
   </div>
 </div>
 <div class="sheet" id="sheet-info" hidden>
@@ -1941,6 +1938,12 @@ document.getElementById('locateBtn').addEventListener('click',()=>{if(geoWatch!=
    with distance (peaks stay fully opaque). Peak subtitles and chat
    answers are untouched; the entrance popup subtitle drops its
    location prefix.
+   v2.11.24: notes-sheet attribution toggle removed (user
+   2026-11-27 20:41): the expand button and the per-model credit
+   list are gone; only the one-line Polyfork credit stays in the
+   notes footer. Pinch zoom at a size clamp no longer pans the
+   view: the anchor uses the achieved ratio (as the wheel handler
+   does), so at size 5 or 85 the anchor term is 0.
    伏那秘境 coordinates are REAL since v2.11.7 (107.02, 22.86 —
    zjv.cn 崇左本地事实库 GEO 问答卡, 2026-11-09; sources: 广西
    文化和旅游厅 / 大新县文旅部门 / 恩城国家级自然保护区; only
@@ -2064,11 +2067,11 @@ document.querySelectorAll('#dock button').forEach(b=>b.addEventListener('click',
   if(!wasOpen){sh.hidden=false;b.classList.add('on');}
 }));
 document.querySelectorAll('.sheet [data-close]').forEach(b=>b.addEventListener('click',closeSheets));
-// v2.10.9: notes-sheet attribution folds by default — the 16 Polyfork
-// CC BY 4.0 lines stay in the DOM verbatim (the licence requires the
-// credit); only the presentation collapses to one line + a toggle.
-const attrBtn=document.getElementById('attrToggle'), attrFull=document.getElementById('attrFull');
-if(attrBtn&&attrFull)attrBtn.addEventListener('click',()=>{const open=attrFull.hidden;attrFull.hidden=!open;attrBtn.textContent=open?'收起':'查看完整署名';});
+// v2.10.9: notes-sheet attribution used to fold by default — the 16
+// Polyfork CC BY 4.0 lines stayed in the DOM verbatim, collapsing to
+// one line + a toggle. The toggle and the full list were later
+// removed at the user's request; only the one-line credit stays in
+// the notes footer. See the change note above.
 /* hint fades out after a while — the map is the point */
 setTimeout(()=>{const h=document.getElementById('hint');if(h)h.style.opacity='0';},8000);
 
@@ -2162,10 +2165,16 @@ let dragging=false; // v2.10.9: single-finger drag active — tick() damps az/el
       const mx=(pA.x+pB.x)/2, my=(pA.y+pB.y)/2;
       if(pinchD>0&&d>0){
         const k=pinchD/d;                       // size factor (new size = old * k)
-        camGoal.size=Math.min(85,Math.max(5,camGoal.size*k));  // v2.7.1: max 85 (was 75; kept for zoom-out headroom past the panorama)
+        // anchor with the ACHIEVED ratio, not the requested one — same
+        // pattern as the wheel handler below. At a size clamp (5 or 85)
+        // the requested k would still pan the view although the size
+        // cannot move (phantom pan: the map slid fast while pinching
+        // at max zoom); kk=1 there, so the anchor term is 0.
+        const ns=Math.min(85,Math.max(5,camGoal.size*k));  // v2.7.1: max 85 (was 75; kept for zoom-out headroom past the panorama)
+        const kk=ns/camGoal.size; camGoal.size=ns;
         // keep the world point under the pinch midpoint fixed on screen
         const ox=mx-canvas.clientWidth/2, oy=my-canvas.clientHeight/2;
-        panByScreen(ox*(1-1/k), oy*(1-1/k));
+        panByScreen(ox*(1-1/kk), oy*(1-1/kk));
       }
       if(pinchA!==null){camGoal.az+=a-pinchA;}  // twist to rotate
       // v2.10.9: two-finger drag -> pan (Pocket City: single-finger

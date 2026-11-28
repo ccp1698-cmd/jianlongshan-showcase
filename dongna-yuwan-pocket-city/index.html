@@ -135,7 +135,6 @@ button:focus-visible,a:focus-visible{outline:2px solid var(--gold);outline-offse
   <span class="grp">
     <button class="zb" id="zin">＋</button>
     <button class="zb" id="zout">－</button>
-    <button id="reset">复位</button>
   </span>
   <span class="sep"></span>
   <button id="labelBtn" class="on"><span class="lbl">文字标注</span><span class="sw"><i></i></span></button>
@@ -801,7 +800,7 @@ function defaultParams(){
   // the whole map). Shared by defaultView() and the label-visibility rule
   // in positionMarkers(), so both agree on what "the overview" is.
   // (2026-11-28: the 全景 button no longer uses this — it uses the true
-  // fit-all, the user's 21:08 reference. This stays the opening / reset view.)
+  // fit-all, the user's 21:08 reference. This stays the opening view.)
   const fit=fitZoom();
   const zT=Math.max(fit, Math.min(0.75*CH/(_cb.y1-_cb.y0), fit*8));
   return {cx:(_cb.x0+_cb.x1)/2, cy:(_cb.y0+_cb.y1)/2, z:zT, fit};
@@ -1198,11 +1197,12 @@ const _secMidX=(D.views.west.plane[0]+D.views.mid.plane[0])/2;
 // are at fit*2.11/2.9/2.28, so fit*1.5 sits cleanly below them.
 // 2026-11-28 (r19 follow-up): the old second rule — "sitting on the
 // default overview also counts as 全景" — is gone. The 全景 button now
-// goes to the true fit-all (z=2.798) while the default opening / reset
+// goes to the true fit-all (z=2.798) while the default opening
 // view is the middle close-up (z=13.391, centre x≈68, i.e. in the mid
 // section), so that rule wrongly showed 全景 at startup. The green now
-// follows the camera's actual position only: startup/reset → 中段,
-// tap 全景 (fit-all) → 全景.
+// follows the camera's actual position only: startup → 中段,
+// tap 全景 (fit-all) → 全景. (2026-11-28 23:00: the 复位 button is gone,
+// so there is no "reset → 中段" rule any more.)
 const _secEastX=(D.views.mid.plane[0]+D.views.east.plane[0])/2;
 function currentSection(){
   const fit=fitZoom();
@@ -1418,7 +1418,8 @@ document.querySelectorAll('.dock [data-v]').forEach(b=>b.addEventListener('click
 }));
 $('#zin').addEventListener('click',()=>setCam(cam.tx,cam.ty,cam.tz*1.35,true));
 $('#zout').addEventListener('click',()=>setCam(cam.tx,cam.ty,cam.tz/1.35,true));
-$('#reset').addEventListener('click',()=>{defaultView(true);$('#card').classList.remove('show');clearRoute();});
+// 2026-11-28 23:00: 复位按钮已去掉（用户要求）——defaultView() 还在，
+// 初始打开仍用它；只是不再有按钮入口。
 $('#labelBtn').addEventListener('click',()=>setLabelOn(!labelOn));
 // initial button state (button only — positionMarkers runs on the first frame)
 $('#labelBtn').classList.toggle('on',labelOn);

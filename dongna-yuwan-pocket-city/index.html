@@ -51,12 +51,12 @@ button:focus-visible,a:focus-visible{outline:2px solid var(--gold);outline-offse
 /* 2026-11-28 21:39 label toggle switch (user: "文字标注" + switch — ON means
    the whole button turns green, like the section buttons; glow removed) */
 #labelBtn{display:inline-flex;align-items:center;gap:6px;padding:7px 8px}
-#labelBtn .lbl{font-weight:700}
+#labelBtn .lbl{font-weight:700;font-size:12px} /* 2026-11-28 21:52 label text -2px (was 14px, inherited from .dock button); only this button */
 #labelBtn.on .lbl{color:#fff}
 #labelBtn .sw{flex:none;width:34px;height:20px;border-radius:999px;background:#c9c6b8;position:relative;transition:background .2s;box-shadow:inset 0 1px 2px rgba(0,0,0,.2)}
 #labelBtn .sw i{position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.35);transition:left .2s}
-#labelBtn.on .sw{background:#7ba889;box-shadow:inset 0 1px 2px rgba(0,0,0,.2)} /* lighter green track so it still reads on the dark-green button; no glow */
-#labelBtn.on .sw i{left:16px}
+#labelBtn.on .sw{background:#fff;box-shadow:inset 0 1px 2px rgba(0,0,0,.2)} /* 2026-11-28 21:52 ON: white track (user: "打开时底是白") */
+#labelBtn.on .sw i{left:16px;background:var(--green)} /* 2026-11-28 21:52 ON: green knob (user: "那个圆形的变成绿色") */
 #labelBtn:not(.on) .lbl{color:#8a8778}
 #card{position:fixed;left:50%;transform:translate(-50%,calc(100% + 90px));bottom:calc(64px + env(safe-area-inset-bottom));z-index:20;width:min(430px,calc(100vw - 24px));background:var(--card);border:1px solid #ddd6c0;border-radius:16px;box-shadow:0 8px 30px rgba(38,60,53,.3);padding:14px 16px 12px;transition:transform .28s ease}
 #card.show{transform:translate(-50%,0)}
@@ -105,7 +105,7 @@ button:focus-visible,a:focus-visible{outline:2px solid var(--gold);outline-offse
   .chip{padding:5px 8px;font-size:11px}
   #hint{top:calc(106px + env(safe-area-inset-top));font-size:11px}
   .dock{gap:1px;padding:5px}.dock button{padding:6px 3px;font-size:12px}.dock .zb{font-size:16px;padding:6px 6px} /* 2026-11-28 20:02 phone dock font -1px (was 13/17px) */ /* 2026-11-28 21:19 phone dock gap 2px→1px: the reordered dock was 4px wider than the 390px content box (scrollW 376 vs clientW 372) */
-  #labelBtn{padding:6px 4px;gap:4px}#labelBtn .sw{width:30px;height:18px}#labelBtn .sw i{width:14px;height:14px}#labelBtn.on .sw i{left:14px} /* 2026-11-28 21:19 phone switch, compact so the dock fits 390px */
+  #labelBtn{padding:6px 4px;gap:4px}#labelBtn .lbl{font-size:10px} /* 2026-11-28 21:52 phone label text -2px (was 12px) */ #labelBtn .sw{width:30px;height:18px}#labelBtn .sw i{width:14px;height:14px}#labelBtn.on .sw i{left:14px} /* 2026-11-28 21:19 phone switch, compact so the dock fits 390px */
 }
 
 #logoImg{height:26px;width:auto;display:block}
@@ -211,7 +211,7 @@ function planeToReal(x,y){
 // which makes it vector-crisp at any zoom (no fixed-resolution cache to
 // upscale, no bitmap anywhere). Small features are culled to the visible
 // plane rect so a full-map frame stays cheap.
-const RIVER_BLUE='#63b8e8'; // storybook style (2026-11-28): bright sky-blue water, like the reference
+const RIVER_BLUE='#29b7c7'; // watercolor landscape style (2026-11-28): bright cyan-green water, like the new reference
 // low-poly helpers: shade a #rrggbb by factor f (clamped), and fill a polygon.
 function shade(hex,f){
   const n=parseInt(hex.slice(1),16);
@@ -262,7 +262,7 @@ function renderGroundInto(vctx,T){
   vctx.scale(1/U,1/U);
   // island green: the KML boat-ring polygon's interior minus the river
   // is exactly the islands (婆皇岛 + middle islets); the river is drawn over it
-  gctx.fillStyle='#a9d97a'; // warm bright grass (storybook style, 2026-11-28)
+  gctx.fillStyle='#b8dd8a'; // pale yellow-green watercolor grass (2026-11-28, new reference)
   flatPath(D.ring); gctx.fill();
   // REMOVED 2026-11-28 (user, live screenshot 图3): the east-bank green
   // landmass fill (D.eastGreen) — it read as an extra block of green land
@@ -301,20 +301,20 @@ function renderGroundInto(vctx,T){
     ch.forEach((p,i)=>{const s=flat(p[0],p[1]); i?gctx.lineTo(s[0],s[1]):gctx.moveTo(s[0],s[1]);});
     gctx.closePath(); gctx.fill();
   }
-  gctx.fillStyle='#a9d97a'; // same warm bright grass as the 婆皇岛 fill
+  gctx.fillStyle='#b8dd8a'; // same pale watercolor grass as the 婆皇岛 fill
   gctx.strokeStyle='rgba(255,255,255,0.55)'; gctx.lineWidth=1.6;
   for(const isl of Object.values(D.islands)){
     gctx.beginPath();
     isl.forEach((p,i)=>{const s=flat(p[0],p[1]); i?gctx.lineTo(s[0],s[1]):gctx.moveTo(s[0],s[1]);});
     gctx.closePath(); gctx.fill(); gctx.stroke();
   }
-  // storybook beach (2026-11-28, user 21:26 "画风用这种的"): a pale sand
-  // ring straddling every shoreline — river banks + all 15 islands, like
+  // watercolor beach (2026-11-28, new reference): a pale cream ring
+  // straddling every shoreline — river banks + all 15 islands, like
   // the reference. Not clipped: the sand sits half on land, half on water.
   // Drawn after the island fills so it is not covered by them. Solid
   // colour (the river-loop island holes and the island outlines trace
   // nearly the same shores, so a double-paint stays the same tone).
-  gctx.strokeStyle='#e9d6a8'; gctx.lineWidth=10; gctx.lineJoin='round'; gctx.lineCap='round';
+  gctx.strokeStyle='#f2e6c2'; gctx.lineWidth=10; gctx.lineJoin='round'; gctx.lineCap='round';
   gctx.beginPath();
   for(const lp of D.riverPath){
     lp.forEach((p,i)=>{const s=flat(p[0],p[1]); i?gctx.lineTo(s[0],s[1]):gctx.moveTo(s[0],s[1]);});
@@ -334,7 +334,7 @@ function renderGroundInto(vctx,T){
     gctx.closePath();
   }
   gctx.stroke();
-  // storybook water texture: small white wave flecks beside the boat route
+  // watercolor water texture: small white wave flecks beside the boat route
   (function(){
     gctx.strokeStyle='rgba(255,255,255,0.65)'; gctx.lineWidth=1.4; gctx.lineCap='round';
     let dist=0, next=2;
@@ -505,7 +505,7 @@ function drawBridge(b){
   }
 }
 function drawRoundCanopy(cx,cy,R,pal){
-  // storybook round tree crown (2026-11-28, user 21:26): a puffy round
+  // watercolor round tree crown (2026-11-28, new reference): a puffy round
   // canopy, radial-shaded (light upper-left, dark lower edge), soft darker
   // outline. pal = [light, mid, dark].
   const gr=gctx.createRadialGradient(cx-R*0.35,cy-R*0.4,R*0.1, cx,cy,R);
@@ -535,14 +535,16 @@ function drawPalm(cx,base,R){
   gctx.beginPath(); gctx.arc(fx+2,fy+2,1.6,0,7); gctx.fill();
 }
 function drawTree(t){
-  // storybook round tree (2026-11-28, user 21:26 "画风用这种的"): a round
-  // puffy canopy (radial-shaded, soft outline) on a thin brown trunk, soft
-  // ground shadow. Three size tiers from t[3]. broad = bright round green,
-  // spruce = darker stacked double-round (a rounded pine), bloom = round
-  // pink. Palms are drawn by drawPalm (the 'palms' prop below).
+  // watercolor round tree (2026-11-28, new reference): a round puffy
+  // canopy (radial-shaded, soft outline) on a thin brown trunk, soft
+  // ground shadow. Canopies are bigger than the storybook version so the
+  // woods read denser, like the reference. Three size tiers from t[3].
+  // broad = bright round green, spruce = darker stacked double-round (a
+  // rounded pine), bloom = round pink. Palms are drawn by drawPalm (the
+  // 'palms' prop below).
   const s=flat(t[0],t[1]);
   const tier=t[3]<1.1?0:(t[3]<1.4?1:2);
-  const R=[5.2,6.4,7.6][tier];
+  const R=[6.0,7.4,8.8][tier];
   const th=R*0.85;
   const cx=s[0], base=s[1];
   // soft ground shadow, offset down-right (light from upper-left)
@@ -557,8 +559,8 @@ function drawTree(t){
   gctx.strokeStyle='#7a5230'; gctx.lineWidth=Math.max(1.2,R*0.26); gctx.lineCap='round';
   gctx.beginPath(); gctx.moveTo(cx,base); gctx.lineTo(cx,top); gctx.stroke();
   const pal=t[2]==='bloom'?['#fbe3ea','#f2a8bd','#dd7f9c']
-    :t[2]==='spruce'?['#8ac98a','#4a9a52','#2e7a3f']
-    :['#b5e39a','#6fbf5e','#3f9448'];
+    :t[2]==='spruce'?['#9ad69a','#5aa862','#3a8a4a']
+    :['#c2e8a8','#7fc96e','#4a9e52'];
   const cyTop=top-R*0.6;
   if(t[2]==='spruce'){
     drawRoundCanopy(cx,cyTop,R,pal);
@@ -567,46 +569,48 @@ function drawTree(t){
     drawRoundCanopy(cx,cyTop,R,pal);
   }
 }
-// storybook house colours (2026-11-28, user 21:26): bright varied roofs
-// and warm walls, picked deterministically from the position so each house
-// keeps its colour.
-const ROOF_COLORS=['#e07840','#7a5fc0','#4a7ec2','#4a9a5a','#c94a4a','#d9a03c','#c96a9a','#5a8a9a'];
+// watercolor cottage colours (2026-11-28, new reference): soft pastel
+// roofs and pale warm walls, picked deterministically from the position
+// so each house keeps its colour.
+const ROOF_COLORS=['#e8905f','#9a86d8','#6a9ad8','#6ab078','#d87070','#e0b45c','#d88ab0','#7aaab8'];
 const WALL_COLORS=['#fdf3d8','#fde8c8','#f3e0e8','#dce8f2','#e8f0d8','#f7e8c8'];
 function storyColor(pal,x,y){
   const h=Math.abs(Math.sin(x*12.9898+y*78.233)*43758.5453);
   return pal[Math.floor(h*pal.length)%pal.length];
 }
 function drawHouseAt(s,w,hgt,roof,wall,roofAccent){
-  // storybook house (2026-11-28, user 21:26 "画风用这种的"): a colourful
-  // isometric box house — warm cream walls, a bright pyramid roof, a
-  // chimney, warm yellow windows and a door. w = half-width, hgt = wall
-  // height; the box bottom sits at s[1].
-  const cyTop=s[1]-hgt-w*0.5, rr=w*0.5; // top-face centre, roof rise
+  // watercolor cottage (2026-11-28, new reference): a small soft
+  // isometric house — pale cream walls, a pastel pitched roof, warm
+  // yellow windows; big halls get a small chimney and a door. w =
+  // half-width, hgt = wall height; the box bottom sits at s[1].
+  const cyTop=s[1]-hgt-w*0.5, rr=w*0.42; // top-face centre, roof rise (low pitch, like the reference)
   const N=[s[0],cyTop-w*0.5], E=[s[0]+w,cyTop], S=[s[0],cyTop+w*0.5], W=[s[0]-w,cyTop];
   const A=[s[0],cyTop-rr]; // roof apex
   // soft shadow
-  gctx.fillStyle='rgba(46,80,52,0.16)';
+  gctx.fillStyle='rgba(46,80,52,0.14)';
   gctx.beginPath(); gctx.ellipse(s[0],s[1]+1,w*1.25,w*0.41,0,0,7); gctx.fill();
-  // body faces
-  poly([W,S,[S[0],s[1]],[W[0],cyTop+hgt]],shade(wall,0.92)); // left wall
-  poly([S,E,[E[0],cyTop+hgt],[S[0],s[1]]],shade(wall,0.82)); // right wall
-  poly([N,E,S,W],shade(wall,1.04)); // top face
+  // body faces (soft shading — watercolor, low contrast)
+  poly([W,S,[S[0],s[1]],[W[0],cyTop+hgt]],shade(wall,0.96)); // left wall
+  poly([S,E,[E[0],cyTop+hgt],[S[0],s[1]]],shade(wall,0.90)); // right wall
+  poly([N,E,S,W],shade(wall,1.03)); // top face
   // pyramid roof: N-W lightest, E-N light, W-S mid, S-E darkest;
   // a hall passes roofAccent for the front (S-E) face.
-  poly([N,W,A],shade(roof,1.12));
+  poly([N,W,A],shade(roof,1.10));
   poly([E,N,A],shade(roof,1.02));
-  poly([W,S,A],roofAccent?shade(roofAccent,0.9):shade(roof,0.88));
-  poly([S,E,A],roofAccent?roofAccent:shade(roof,0.76));
-  // chimney: warm-brick stack on the right roof slope
-  const chX=s[0]+w*0.35, chY=cyTop-rr*0.5;
-  gctx.fillStyle='#a85a3c';
-  gctx.fillRect(chX-1.6,chY-5,3.2,6);
-  gctx.fillStyle='#d98a5a';
-  gctx.fillRect(chX-2.2,chY-6.2,4.4,1.8);
+  poly([W,S,A],roofAccent?shade(roofAccent,0.9):shade(roof,0.90));
+  poly([S,E,A],roofAccent?roofAccent:shade(roof,0.80));
+  // chimney: only on big houses (halls), small and soft
+  if(w>=10){
+    const chX=s[0]+w*0.35, chY=cyTop-rr*0.5;
+    gctx.fillStyle='#b0704e';
+    gctx.fillRect(chX-1.4,chY-4,2.8,5);
+    gctx.fillStyle='#d89a6a';
+    gctx.fillRect(chX-1.9,chY-5,3.8,1.6);
+  }
   // windows: warm yellow panes on the two wall faces
   const wy=s[1]-hgt*0.62;
   gctx.fillStyle='#f7d774';
-  gctx.strokeStyle='rgba(90,60,30,0.5)'; gctx.lineWidth=0.8;
+  gctx.strokeStyle='rgba(90,60,30,0.45)'; gctx.lineWidth=0.8;
   gctx.fillRect(s[0]-w*0.5-2,wy-2.5,4,5); gctx.strokeRect(s[0]-w*0.5-2,wy-2.5,4,5);
   if(w<10){
     gctx.fillRect(s[0]+w*0.5-2,wy-2.5,4,5); gctx.strokeRect(s[0]+w*0.5-2,wy-2.5,4,5);
@@ -633,18 +637,18 @@ function drawProp(p){
   if(kind==='gate'){ gctx.fillStyle='#c94a3a'; gctx.fillRect(s[0]-11,s[1]-20,22,20);
     gctx.fillStyle='#e8b923'; gctx.fillRect(s[0]-13,s[1]-24,26,5);
     gctx.fillStyle='#f7d774'; gctx.fillRect(s[0]-5,s[1]-14,10,14); return; }
-  if(kind==='hall'){ drawHouseAt(s,13,11,storyColor(ROOF_COLORS,p[0],p[1]),storyColor(WALL_COLORS,p[0],p[1]),'#96543e'); return; }
-  if(kind==='pav'){ drawHouseAt(s,7,6,storyColor(ROOF_COLORS,p[0],p[1]),storyColor(WALL_COLORS,p[0],p[1])); return; }
+  if(kind==='hall'){ drawHouseAt(s,12,10,storyColor(ROOF_COLORS,p[0],p[1]),storyColor(WALL_COLORS,p[0],p[1]),'#96543e'); return; }
+  if(kind==='pav'){ drawHouseAt(s,6,5,storyColor(ROOF_COLORS,p[0],p[1]),storyColor(WALL_COLORS,p[0],p[1])); return; }
   if(kind==='deck'){ gctx.fillStyle='#d2a86a'; gctx.fillRect(s[0]-9,s[1]-4,18,8); return; }
-  if(kind==='house2'){ drawHouseAt(s,10,9,storyColor(ROOF_COLORS,p[0],p[1]),storyColor(WALL_COLORS,p[0],p[1])); return; }
-  if(kind==='house'){ drawHouseAt(s,8,7,storyColor(ROOF_COLORS,p[0],p[1]),storyColor(WALL_COLORS,p[0],p[1])); return; }
-  if(kind==='wc'||kind==='med'){ drawHouseAt(s,6,6,storyColor(ROOF_COLORS,p[0],p[1]),storyColor(WALL_COLORS,p[0],p[1])); return; }
+  if(kind==='house2'){ drawHouseAt(s,9,8,storyColor(ROOF_COLORS,p[0],p[1]),storyColor(WALL_COLORS,p[0],p[1])); return; }
+  if(kind==='house'){ drawHouseAt(s,7,6,storyColor(ROOF_COLORS,p[0],p[1]),storyColor(WALL_COLORS,p[0],p[1])); return; }
+  if(kind==='wc'||kind==='med'){ drawHouseAt(s,5,5,storyColor(ROOF_COLORS,p[0],p[1]),storyColor(WALL_COLORS,p[0],p[1])); return; }
   if(kind==='park'){ return; }
   if(kind==='corr'){ gctx.strokeStyle='#a8763e'; gctx.lineWidth=4; gctx.beginPath(); gctx.moveTo(s[0]-14,s[1]+6); gctx.lineTo(s[0]+14,s[1]-6); gctx.stroke(); return; }
   if(kind==='rapids'){ gctx.strokeStyle='rgba(255,255,255,.85)'; gctx.lineWidth=2.4;
     for(let i=-1;i<2;i++){gctx.beginPath(); gctx.moveTo(s[0]+i*7-4,s[1]+8); gctx.lineTo(s[0]+i*7+2,s[1]-8); gctx.stroke();} return; }
   if(kind==='cave'){ gctx.fillStyle='#4a4a44'; gctx.beginPath(); gctx.arc(s[0],s[1]-2,7,Math.PI,0); gctx.fill(); return; }
-  if(kind==='mirror'){ gctx.fillStyle='#63b8e8'; gctx.beginPath(); gctx.ellipse(s[0],s[1]-3,11,5,0,0,7); gctx.fill();
+  if(kind==='mirror'){ gctx.fillStyle=RIVER_BLUE; gctx.beginPath(); gctx.ellipse(s[0],s[1]-3,11,5,0,0,7); gctx.fill();
     gctx.strokeStyle='#fff'; gctx.lineWidth=1; gctx.stroke(); return; }
   if(kind==='bamboo'){ gctx.strokeStyle='#4a9a52'; gctx.lineWidth=1.6;
     for(let i=-2;i<3;i++){gctx.beginPath(); gctx.moveTo(s[0]+i*3,s[1]); gctx.lineTo(s[0]+i*3+2,s[1]-10-Math.abs(i)); gctx.stroke();} return; }
@@ -653,12 +657,12 @@ function drawProp(p){
     for(let i=-1;i<2;i++){const hgt=kind==='pillars'?20:11; const x=s[0]+i*6-2.4;
       gctx.fillStyle='#9a8a72'; gctx.fillRect(x,s[1]-hgt,5,hgt);
       gctx.fillStyle='#c2b28e'; gctx.fillRect(x,s[1]-hgt,5,2.5);} return; }
-  if(kind==='aqua'){ gctx.strokeStyle='#63b8e8'; gctx.lineWidth=3; gctx.beginPath(); gctx.moveTo(s[0]-12,s[1]-6); gctx.lineTo(s[0]+12,s[1]-6); gctx.stroke(); return; }
+  if(kind==='aqua'){ gctx.strokeStyle=RIVER_BLUE; gctx.lineWidth=3; gctx.beginPath(); gctx.moveTo(s[0]-12,s[1]-6); gctx.lineTo(s[0]+12,s[1]-6); gctx.stroke(); return; }
   if(kind==='palms'){ for(let i=-1;i<2;i++){ drawPalm(s[0]+i*8, s[1], 5); } return; }
-  if(kind==='mound'){ // storybook bump: warm grass ellipse + lighter facet
-    gctx.fillStyle='#a9d97a'; gctx.beginPath(); gctx.ellipse(s[0],s[1]-2,13,6,0,0,7); gctx.fill();
-    poly([[s[0]-11,s[1]+1],[s[0],s[1]-8],[s[0]+11,s[1]+1]],'#c2e39a'); return; }
-  drawHouseAt(s,7,6,storyColor(ROOF_COLORS,p[0],p[1]),storyColor(WALL_COLORS,p[0],p[1]));
+  if(kind==='mound'){ // watercolor bump: pale grass ellipse + lighter facet
+    gctx.fillStyle='#b8dd8a'; gctx.beginPath(); gctx.ellipse(s[0],s[1]-2,13,6,0,0,7); gctx.fill();
+    poly([[s[0]-11,s[1]+1],[s[0],s[1]-8],[s[0]+11,s[1]+1]],'#cde8a8'); return; }
+  drawHouseAt(s,6,5,storyColor(ROOF_COLORS,p[0],p[1]),storyColor(WALL_COLORS,p[0],p[1]));
 }
 function drawParking(p){
   const s=flat(p[0],p[1]);
@@ -713,23 +717,34 @@ function drawFlower(fl){
   gctx.drawImage(sp,s[0]-8,s[1]-16,16,16);
 }
 function drawPeak(s){
-  // storybook hill (reference style): soft base shadow, 4 warm bright
-  // green facets meeting at a centre crease, plus a small satellite bump.
-  // Same footprint/height as before; drawn in the top ground layer, above
-  // the cars, so a car passing it slides behind it.
-  const p=flat(s.x,s.y), hgt=46+(s.peakH||300)*0.09, hw=36;
-  gctx.fillStyle='rgba(46,80,52,0.16)';
-  gctx.beginPath(); gctx.ellipse(p[0],p[1]+2,hw*1.05,hw*0.28,0,0,7); gctx.fill();
-  const A=[p[0],p[1]-hgt], L=[p[0]-hw,p[1]], R=[p[0]+hw,p[1]], C=[p[0],p[1]];
-  const M=[p[0]-hw*0.18,p[1]-hgt*0.42]; // centre crease point
-  poly([L,A,M],'#6a9a5a'); // upper-left facet
-  poly([A,R,M],'#8ab86a'); // upper-right facet
-  poly([L,M,C],'#a5cc7a'); // lower-left facet
-  poly([M,R,C],'#7aa85e'); // lower-right facet
+  // watercolor landscape hills (2026-11-28, new reference): soft rounded
+  // layered domes, no sharp facets — a big light dome in front, a darker
+  // dome peeking out behind it, and a small satellite bump on the
+  // shoulder. Same footprint/height as before; drawn in the top ground
+  // layer, above the cars, so a car passing it slides behind it.
+  const p=flat(s.x,s.y), hgt=46+(s.peakH||300)*0.09, hw=36, base=p[1], cx=p[0];
+  gctx.fillStyle='rgba(46,80,52,0.14)';
+  gctx.beginPath(); gctx.ellipse(cx,base+2,hw*1.05,hw*0.28,0,0,7); gctx.fill();
+  // back dome (darker, offset right) — the layered look of the reference
+  let gr=gctx.createRadialGradient(cx+hw*0.28,base-hgt*0.4,hgt*0.08, cx+hw*0.28,base-hgt*0.4,hgt*0.62);
+  gr.addColorStop(0,'#8cc47a'); gr.addColorStop(1,'#5d9a58');
+  gctx.fillStyle=gr;
+  gctx.beginPath(); gctx.ellipse(cx+hw*0.28,base,hw*0.62,hgt*0.62,0,Math.PI,0); gctx.fill();
+  // main dome (light, front-left)
+  gr=gctx.createRadialGradient(cx-hw*0.12,base-hgt*0.55,hgt*0.1, cx-hw*0.12,base-hgt*0.55,hgt*0.85);
+  gr.addColorStop(0,'#b9e091'); gr.addColorStop(0.6,'#8cc47a'); gr.addColorStop(1,'#6aa863');
+  gctx.fillStyle=gr;
+  gctx.beginPath(); gctx.ellipse(cx-hw*0.12,base,hw*0.78,hgt*0.85,0,Math.PI,0); gctx.fill();
+  // soft highlight on the top of the main dome
+  gctx.fillStyle='rgba(255,255,255,0.25)';
+  gctx.beginPath(); gctx.ellipse(cx-hw*0.24,base-hgt*0.62,hw*0.3,hgt*0.16,0,0,7); gctx.fill();
   // satellite bump on the left shoulder
-  poly([[p[0]-hw*0.92,p[1]],[p[0]-hw*0.62,p[1]-hgt*0.38],[p[0]-hw*0.32,p[1]]],'#7aa85e');
+  gr=gctx.createRadialGradient(cx-hw*0.7,base-hgt*0.25,hgt*0.05, cx-hw*0.7,base-hgt*0.25,hgt*0.42);
+  gr.addColorStop(0,'#a5d183'); gr.addColorStop(1,'#6aa863');
+  gctx.fillStyle=gr;
+  gctx.beginPath(); gctx.ellipse(cx-hw*0.7,base,hw*0.34,hgt*0.42,0,Math.PI,0); gctx.fill();
 }
-// ---- painted boat (top-down, storybook style): warm wooden hull + deck,
+// ---- painted boat (top-down, watercolor style): warm wooden hull + deck,
 // a cream cabin with a bright red roof, and a little pennant flag at the
 // stern — a wooden-boat / sailboat feel, like the reference. Drawn in
 // plane space (units), rotated to the heading. Length ~2.2 plane units.

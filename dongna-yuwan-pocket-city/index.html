@@ -191,7 +191,18 @@ function planeToReal(x,y){
 // which makes it vector-crisp at any zoom (no fixed-resolution cache to
 // upscale, no bitmap anywhere). Small features are culled to the visible
 // plane rect so a full-map frame stays cheap.
-const RIVER_BLUE='#1fa8dd'; // forest-healing style (2026-11-28): bright blue water
+const RIVER_BLUE='#5fa396'; // low-poly style (2026-11-28): muted teal water, like the reference
+// low-poly helpers: shade a #rrggbb by factor f (clamped), and fill a polygon.
+function shade(hex,f){
+  const n=parseInt(hex.slice(1),16);
+  const c=v=>Math.max(0,Math.min(255,Math.round(v*f)));
+  return 'rgb('+c(n>>16)+','+c((n>>8)&255)+','+c(n&255)+')';
+}
+function poly(pts,fill){
+  gctx.fillStyle=fill; gctx.beginPath();
+  pts.forEach((p,i)=>{i?gctx.lineTo(p[0],p[1]):gctx.moveTo(p[0],p[1]);});
+  gctx.closePath(); gctx.fill();
+}
 const _cb={x0:1e9,x1:-1e9,y0:1e9,y1:-1e9};
 (function(){const add=p=>{_cb.x0=Math.min(_cb.x0,p[0]);_cb.x1=Math.max(_cb.x1,p[0]);_cb.y0=Math.min(_cb.y0,p[1]);_cb.y1=Math.max(_cb.y1,p[1]);};
   D.spots.forEach(s=>add([s.x,s.y])); D.ring.forEach(add); D.road.forEach(add);
@@ -230,14 +241,14 @@ function renderGroundInto(vctx,T){
   vctx.scale(1/U,1/U);
   // island green: the KML boat-ring polygon's interior minus the river
   // is exactly the islands (婆皇岛 + middle islets); the river is drawn over it
-  gctx.fillStyle='#b9e39a'; // fresh light-green island (forest-healing style)
+  gctx.fillStyle='#a9cf92'; // muted sage island (low-poly style)
   flatPath(D.ring); gctx.fill();
   // east-bank green landmass (KML: north edge = new river south bank)
   flatPath(D.eastGreen); gctx.fill();
-  // forest groves: soft fresh-green blobs
+  // forest groves: soft sage blobs
   for(const f of D.forest){
     const s=flat(f[0],f[1]);
-    gctx.fillStyle='rgba(168,220,138,0.7)';
+    gctx.fillStyle='rgba(158,196,138,0.6)';
     gctx.beginPath(); gctx.ellipse(s[0],s[1],f[2]*U,f[3]*U,0,0,7); gctx.fill();
   }
   // river: vector paths (merged west+east, disjoint loops, real island
@@ -336,13 +347,13 @@ function drawChevrons(pts){
 function drawBridge(b){
   const a=flat(b.a[0],b.a[1]), c=flat(b.b[0],b.b[1]);
   const w=b.susp?8:6;
-  // warm brown wood (forest-healing style): dark wood edge, lighter deck
-  gctx.strokeStyle='#7a5230'; gctx.lineWidth=w; gctx.lineCap='round';
+  // low-poly style: muted taupe deck, flat, no warm-wood glow
+  gctx.strokeStyle='#8a7a5e'; gctx.lineWidth=w; gctx.lineCap='round';
   gctx.beginPath(); gctx.moveTo(a[0],a[1]); gctx.lineTo(c[0],c[1]); gctx.stroke();
-  gctx.strokeStyle=b.susp?'#d9a86a':'#e8dcc0'; gctx.lineWidth=w*0.45;
+  gctx.strokeStyle=b.susp?'#cfc4a4':'#d8cdb2'; gctx.lineWidth=w*0.45;
   gctx.beginPath(); gctx.moveTo(a[0],a[1]); gctx.lineTo(c[0],c[1]); gctx.stroke();
   if(b.susp){
-    gctx.strokeStyle='#5d4a33'; gctx.lineWidth=2;
+    gctx.strokeStyle='#6a5a44'; gctx.lineWidth=2;
     const ang=Math.atan2(c[1]-a[1],c[0]-a[0])+Math.PI/2, L=6;
     for(const f of [0.33,0.67]){
       const x=a[0]+(c[0]-a[0])*f, y=a[1]+(c[1]-a[1])*f;
@@ -395,32 +406,34 @@ function drawTree(t){
     drawCubeTree(cx,cyTop,R,pal);
   }
 }
-function drawHouseAt(s,w,hgt,roof,wall){
-  gctx.fillStyle=wall;
-  gctx.fillRect(s[0]-w,s[1]-hgt,w*2,hgt);
-  gctx.fillStyle=roof;
-  gctx.beginPath(); gctx.moveTo(s[0]-w-1.5,s[1]-hgt); gctx.lineTo(s[0],s[1]-hgt-w*0.62); gctx.lineTo(s[0]+w+1.5,s[1]-hgt); gctx.closePath(); gctx.fill();
-  gctx.strokeStyle='rgba(38,60,53,.45)'; gctx.lineWidth=0.8;
-  gctx.strokeRect(s[0]-w,s[1]-hgt,w*2,hgt);
-  gctx.fillStyle='rgba(38,60,53,.55)';
-  gctx.fillRect(s[0]-1.5,s[1]-hgt*0.55,3,hgt*0.55);
-  // chimney smoke on about one house in three (forest-healing style):
-  // a little chimney on the roof + a soft grey wisp above it.
-  if(((Math.round(s[0])+Math.round(s[1])*3)%3)===0){
-    const cx=s[0]+w*0.55, cy=s[1]-hgt-w*0.35;
-    gctx.fillStyle='#8a7a68'; gctx.fillRect(cx-1,cy-3,2.4,4);
-    gctx.fillStyle='rgba(180,180,175,0.55)';
-    gctx.beginPath(); gctx.arc(cx+1,cy-6,2.2,0,7); gctx.fill();
-    gctx.fillStyle='rgba(180,180,175,0.35)';
-    gctx.beginPath(); gctx.arc(cx+2.5,cy-10,2.8,0,7); gctx.fill();
-  }
+function drawHouseAt(s,w,hgt,roof,wall,roofAccent){
+  // low-poly isometric box house (reference style, 2026-11-28): soft ground
+  // shadow, box body (light top / mid left / dark right face), shallow
+  // 4-face pyramid roof (light from upper-left). No door, no chimney smoke.
+  // w = half-width, hgt = wall height; the box bottom sits at s[1].
+  const cyTop=s[1]-hgt-w*0.5, rr=w*0.45; // top-face centre, roof rise
+  const N=[s[0],cyTop-w*0.5], E=[s[0]+w,cyTop], S=[s[0],cyTop+w*0.5], W=[s[0]-w,cyTop];
+  const A=[s[0],cyTop-rr]; // roof apex
+  // soft shadow
+  gctx.fillStyle='rgba(46,80,52,0.16)';
+  gctx.beginPath(); gctx.ellipse(s[0],s[1]+1,w*1.25,w*0.41,0,0,7); gctx.fill();
+  // body faces
+  poly([W,S,[S[0],s[1]],[W[0],cyTop+hgt]],shade(wall,0.92)); // left wall
+  poly([S,E,[E[0],cyTop+hgt],[S[0],s[1]]],shade(wall,0.82)); // right wall
+  poly([N,E,S,W],shade(wall,1.04)); // top face
+  // pyramid roof: N-W lightest, E-N light, W-S mid, S-E darkest;
+  // a hall passes roofAccent for the front (S-E) face.
+  poly([N,W,A],shade(roof,1.12));
+  poly([E,N,A],shade(roof,1.02));
+  poly([W,S,A],roofAccent?shade(roofAccent,0.9):shade(roof,0.88));
+  poly([S,E,A],roofAccent?roofAccent:shade(roof,0.76));
 }
 function drawVillage(v){
   const n=v[2];
   for(let i=0;i<n;i++){
     const dx=(i%3-1)*0.65, dy=(Math.floor(i/3)-0.5)*0.55;
     const s=flat(v[0]+dx,v[1]+dy);
-    drawHouseAt(s,7,7,v[3]==='stilt'?'#8a4a2b':'#b84a2e','#fffdf6'); // red roofs
+    drawHouseAt(s,7,7,v[3]==='stilt'?'#6e4a38':'#8a5a44','#eef0e6'); // muted terracotta roofs
   }
 }
 function drawProp(p){
@@ -428,70 +441,76 @@ function drawProp(p){
   if(kind==='dock'){ gctx.strokeStyle='#7a5c3e'; gctx.lineWidth=4;
     gctx.beginPath(); gctx.moveTo(s[0]-12,s[1]+4); gctx.lineTo(s[0]+12,s[1]-4); gctx.stroke();
     gctx.strokeStyle='#e8e0c8'; gctx.lineWidth=2; gctx.beginPath(); gctx.moveTo(s[0]-12,s[1]+4); gctx.lineTo(s[0]+12,s[1]-4); gctx.stroke(); return; }
-  if(kind==='gate'){ gctx.fillStyle='#ac4931'; gctx.fillRect(s[0]-11,s[1]-20,22,20);
-    gctx.fillStyle='#e8b923'; gctx.fillRect(s[0]-13,s[1]-24,26,5);
+  if(kind==='gate'){ gctx.fillStyle='#96543e'; gctx.fillRect(s[0]-11,s[1]-20,22,20);
+    gctx.fillStyle='#c9a86a'; gctx.fillRect(s[0]-13,s[1]-24,26,5);
     gctx.fillStyle='#f6f3e9'; gctx.fillRect(s[0]-5,s[1]-14,10,14); return; }
-  if(kind==='hall'){ drawHouseAt(s,13,11,'#2e3a2e','#f3ead2');
-    gctx.fillStyle='#ac4931'; gctx.fillRect(s[0]-13,s[1]-24,26,3); return; }
-  if(kind==='pav'){ drawHouseAt(s,7,6,'#7a4a2b','#fffdf6'); return; }
-  if(kind==='deck'){ gctx.fillStyle='#c9a86a'; gctx.fillRect(s[0]-9,s[1]-4,18,8); return; }
-  if(kind==='house2'){ drawHouseAt(s,10,9,'#b84a2e','#fffdf6'); return; }
-  if(kind==='house'){ drawHouseAt(s,8,7,'#a8542e','#fffdf6'); return; }
-  if(kind==='wc'||kind==='med'){ drawHouseAt(s,6,6,kind==='med'?'#ac4931':'#3a5a8a','#fffdf6'); return; }
+  if(kind==='hall'){ drawHouseAt(s,13,11,'#4a5a48','#e8e4d5','#96543e'); return; }
+  if(kind==='pav'){ drawHouseAt(s,7,6,'#6e4a38','#eef0e6'); return; }
+  if(kind==='deck'){ gctx.fillStyle='#c2b28e'; gctx.fillRect(s[0]-9,s[1]-4,18,8); return; }
+  if(kind==='house2'){ drawHouseAt(s,10,9,'#8a5a44','#eef0e6'); return; }
+  if(kind==='house'){ drawHouseAt(s,8,7,'#8a5a44','#eef0e6'); return; }
+  if(kind==='wc'||kind==='med'){ drawHouseAt(s,6,6,kind==='med'?'#96543e':'#5a6a7a','#eef0e6'); return; }
   if(kind==='park'){ return; }
-  if(kind==='corr'){ gctx.strokeStyle='#8a6d3b'; gctx.lineWidth=4; gctx.beginPath(); gctx.moveTo(s[0]-14,s[1]+6); gctx.lineTo(s[0]+14,s[1]-6); gctx.stroke(); return; }
-  if(kind==='rapids'){ gctx.strokeStyle='rgba(255,255,255,.9)'; gctx.lineWidth=2.4;
+  if(kind==='corr'){ gctx.strokeStyle='#9a8a68'; gctx.lineWidth=4; gctx.beginPath(); gctx.moveTo(s[0]-14,s[1]+6); gctx.lineTo(s[0]+14,s[1]-6); gctx.stroke(); return; }
+  if(kind==='rapids'){ gctx.strokeStyle='rgba(255,255,255,.85)'; gctx.lineWidth=2.4;
     for(let i=-1;i<2;i++){gctx.beginPath(); gctx.moveTo(s[0]+i*7-4,s[1]+8); gctx.lineTo(s[0]+i*7+2,s[1]-8); gctx.stroke();} return; }
-  if(kind==='cave'){ gctx.fillStyle='#3a3a3a'; gctx.beginPath(); gctx.arc(s[0],s[1]-2,7,Math.PI,0); gctx.fill(); return; }
-  if(kind==='mirror'){ gctx.fillStyle='#7fb8c9'; gctx.beginPath(); gctx.ellipse(s[0],s[1]-3,11,5,0,0,7); gctx.fill();
+  if(kind==='cave'){ gctx.fillStyle='#4a4a44'; gctx.beginPath(); gctx.arc(s[0],s[1]-2,7,Math.PI,0); gctx.fill(); return; }
+  if(kind==='mirror'){ gctx.fillStyle='#7aa8a0'; gctx.beginPath(); gctx.ellipse(s[0],s[1]-3,11,5,0,0,7); gctx.fill();
     gctx.strokeStyle='#fff'; gctx.lineWidth=1; gctx.stroke(); return; }
-  if(kind==='bamboo'){ gctx.strokeStyle='#4e8a54'; gctx.lineWidth=1.6;
+  if(kind==='bamboo'){ gctx.strokeStyle='#5d8a62'; gctx.lineWidth=1.6;
     for(let i=-2;i<3;i++){gctx.beginPath(); gctx.moveTo(s[0]+i*3,s[1]); gctx.lineTo(s[0]+i*3+2,s[1]-10-Math.abs(i)); gctx.stroke();} return; }
-  if(kind==='rocks'||kind==='pillars'){ gctx.fillStyle='#8a8f7a';
-    for(let i=-1;i<2;i++){const hgt=kind==='pillars'?20:11; gctx.fillRect(s[0]+i*6-2.4,s[1]-hgt,5,hgt);} return; }
+  if(kind==='rocks'||kind==='pillars'){ // low-poly faceted blocks: flat grey-green
+    // rects with a lighter top strip, reads as a cut stone face
+    for(let i=-1;i<2;i++){const hgt=kind==='pillars'?20:11; const x=s[0]+i*6-2.4;
+      gctx.fillStyle='#7a7f6e'; gctx.fillRect(x,s[1]-hgt,5,hgt);
+      gctx.fillStyle='#9aa08a'; gctx.fillRect(x,s[1]-hgt,5,2.5);} return; }
   if(kind==='aqua'){ gctx.strokeStyle='#9a8a6a'; gctx.lineWidth=3; gctx.beginPath(); gctx.moveTo(s[0]-12,s[1]-6); gctx.lineTo(s[0]+12,s[1]-6); gctx.stroke(); return; }
   if(kind==='palms'){ for(let i=-1;i<2;i++){const px=s[0]+i*8; gctx.strokeStyle='#5d4a33'; gctx.lineWidth=1.6;
     gctx.beginPath(); gctx.moveTo(px,s[1]); gctx.lineTo(px,s[1]-9); gctx.stroke();
     drawCubeTree(px,s[1]-9-4.5*0.5-4.5*0.9,4.5,['#8ccb8e','#5aa86a','#3f8a52']);} return; }
-  if(kind==='mound'){ gctx.fillStyle='#6aa86a'; gctx.beginPath(); gctx.ellipse(s[0],s[1]-2,13,6,0,0,7); gctx.fill(); return; }
-  drawHouseAt(s,7,6,'#3a3a3a','#fffdf6');
+  if(kind==='mound'){ // low-poly bump: flat sage ellipse + lighter facet
+    gctx.fillStyle='#8aa87e'; gctx.beginPath(); gctx.ellipse(s[0],s[1]-2,13,6,0,0,7); gctx.fill();
+    poly([[s[0]-11,s[1]+1],[s[0],s[1]-8],[s[0]+11,s[1]+1]],'#a8c49a'); return; }
+  drawHouseAt(s,7,6,'#5a5a52','#eef0e6');
 }
 function drawParking(p){
   const s=flat(p[0],p[1]);
-  gctx.fillStyle='#e8e6da'; gctx.fillRect(s[0]-11,s[1]-8,22,16);
+  gctx.fillStyle='#e6e4d8'; gctx.fillRect(s[0]-11,s[1]-8,22,16);
   gctx.strokeStyle='#9a978a'; gctx.lineWidth=1; gctx.strokeRect(s[0]-11,s[1]-8,22,16);
-  gctx.fillStyle='#2e5d43'; gctx.font='bold 11px sans-serif'; gctx.textAlign='center'; gctx.fillText('P',s[0],s[1]+4);
+  gctx.fillStyle='#4a6a58'; gctx.font='bold 11px sans-serif'; gctx.textAlign='center'; gctx.fillText('P',s[0],s[1]+4);
 }
 function drawFlower(fl){
   const s=flat(fl[0],fl[1]);
-  gctx.fillStyle=fl[2]===2?'#f0a8bc':'#f2c14e'; // soft pink / yellow dots
+  gctx.fillStyle=fl[2]===2?'#e5b3ba':'#ddc078'; // muted pink / ochre dots
   gctx.beginPath(); gctx.arc(s[0],s[1],2.2,0,7); gctx.fill();
   gctx.fillStyle='rgba(255,255,255,0.7)';
   gctx.beginPath(); gctx.arc(s[0]-0.6,s[1]-0.6,0.9,0,7); gctx.fill();
 }
 function drawPeak(s){
-  // soft layered green mountain (forest-healing style); the peak is drawn
-  // in the top ground layer, above the cars, so a car passing it slides
-  // behind the mountain instead of driving over it.
+  // low-poly faceted hill (reference style): soft base shadow, 4 flat
+  // sage facets meeting at a centre crease, plus a small satellite bump.
+  // Same footprint/height as before; drawn in the top ground layer, above
+  // the cars, so a car passing it slides behind it.
   const p=flat(s.x,s.y), hgt=46+(s.peakH||300)*0.09, hw=36;
-  gctx.fillStyle='#2f7a44';
-  gctx.beginPath(); gctx.moveTo(p[0]-hw,p[1]); gctx.lineTo(p[0],p[1]-hgt); gctx.lineTo(p[0],p[1]); gctx.closePath(); gctx.fill();
-  gctx.fillStyle='#57a05e';
-  gctx.beginPath(); gctx.moveTo(p[0],p[1]-hgt); gctx.lineTo(p[0]+hw,p[1]); gctx.lineTo(p[0],p[1]); gctx.closePath(); gctx.fill();
-  gctx.fillStyle='#8ccb8e';
-  gctx.beginPath(); gctx.moveTo(p[0]-hw*0.55,p[1]-hgt*0.35); gctx.lineTo(p[0],p[1]-hgt*0.62); gctx.lineTo(p[0]+hw*0.45,p[1]-hgt*0.3); gctx.lineTo(p[0]+hw*0.2,p[1]); gctx.lineTo(p[0]-hw*0.3,p[1]); gctx.closePath(); gctx.fill();
-  gctx.strokeStyle='rgba(38,60,53,.35)'; gctx.lineWidth=1;
-  gctx.beginPath(); gctx.moveTo(p[0]-hw,p[1]); gctx.lineTo(p[0],p[1]-hgt); gctx.lineTo(p[0]+hw,p[1]); gctx.stroke();
+  gctx.fillStyle='rgba(46,80,52,0.16)';
+  gctx.beginPath(); gctx.ellipse(p[0],p[1]+2,hw*1.05,hw*0.28,0,0,7); gctx.fill();
+  const A=[p[0],p[1]-hgt], L=[p[0]-hw,p[1]], R=[p[0]+hw,p[1]], C=[p[0],p[1]];
+  const M=[p[0]-hw*0.18,p[1]-hgt*0.42]; // centre crease point
+  poly([L,A,M],'#5d8266'); // upper-left facet
+  poly([A,R,M],'#7a9a72'); // upper-right facet
+  poly([L,M,C],'#8aa87e'); // lower-left facet
+  poly([M,R,C],'#6a8a6a'); // lower-right facet
+  // satellite bump on the left shoulder
+  poly([[p[0]-hw*0.92,p[1]],[p[0]-hw*0.62,p[1]-hgt*0.38],[p[0]-hw*0.32,p[1]]],'#6a8a6a');
 }
-// ---- painted boat (top-down): pointed bow, planked hull, cabin with red
-// roof, raised stern deck + lantern. Drawn in plane space (units), rotated
-// to the heading. Length ~2.2 plane units (~120 m on the cartoon scale —
-// oversized on purpose so it reads as a boat at the default zoom).
+// ---- painted boat (top-down, low-poly style): flat box hull + flat box
+// cabin, muted wood-grey / sage, no plank seams, no red roof. Drawn in
+// plane space (units), rotated to the heading. Length ~2.2 plane units.
 function paintBoat(c, x, y, ang, night){
   c.save(); c.translate(x,y); c.rotate(ang);
   const L=1.1, W=0.34; // half-length / half-width in plane units
-  // hull: pointed bow (+x), flat stern (-x)
-  c.fillStyle='#6b3f22';
+  // hull: pointed bow (+x), flat stern (-x), one flat wood-grey tone
+  c.fillStyle='#8a7a5e';
   c.beginPath();
   c.moveTo(L,0);
   c.quadraticCurveTo(L*0.55,W, L*0.1,W);
@@ -499,8 +518,9 @@ function paintBoat(c, x, y, ang, night){
   c.lineTo(-L,-W*0.55); c.lineTo(-L*0.75,-W);
   c.lineTo(L*0.1,-W); c.quadraticCurveTo(L*0.55,-W, L,0);
   c.closePath(); c.fill();
-  // deck (lighter wood, inset)
-  c.fillStyle='#a9764a';
+  c.strokeStyle='rgba(70,58,40,0.45)'; c.lineWidth=0.03; c.stroke();
+  // deck (lighter wood, inset, flat)
+  c.fillStyle='#b5a888';
   c.beginPath();
   c.moveTo(L*0.88,0);
   c.quadraticCurveTo(L*0.5,W*0.72, L*0.05,W*0.72);
@@ -508,29 +528,18 @@ function paintBoat(c, x, y, ang, night){
   c.lineTo(-L*0.88,-W*0.4); c.lineTo(-L*0.68,-W*0.72);
   c.lineTo(L*0.05,-W*0.72); c.quadraticCurveTo(L*0.5,-W*0.72, L*0.88,0);
   c.closePath(); c.fill();
-  // plank seams
-  c.strokeStyle='rgba(90,55,25,0.5)'; c.lineWidth=0.02;
-  c.beginPath(); c.moveTo(-L*0.68,0); c.lineTo(L*0.85,0); c.stroke();
-  // cabin: cream walls + red roof, mid-ship
-  c.fillStyle='#f3ead2';
+  // cabin: flat box walls + flat sage lid roof (slightly larger, like a box lid)
+  c.fillStyle='#e8e4d5';
   c.fillRect(-L*0.42,-W*0.52,L*0.72,W*1.04);
-  c.fillStyle='#ac4931';
-  c.beginPath();
-  c.moveTo(-L*0.48,-W*0.62); c.lineTo(L*0.36,-W*0.62);
-  c.lineTo(L*0.30,-W*0.95); c.lineTo(-L*0.42,-W*0.95); c.closePath(); c.fill();
-  c.beginPath();
-  c.moveTo(-L*0.48,W*0.62); c.lineTo(L*0.36,W*0.62);
-  c.lineTo(L*0.30,W*0.95); c.lineTo(-L*0.42,W*0.95); c.closePath(); c.fill();
-  // roof ridge
-  c.strokeStyle='#7a2e1d'; c.lineWidth=0.03;
-  c.beginPath(); c.moveTo(-L*0.42,0); c.lineTo(L*0.33,0); c.stroke();
-  // stern deck (raised, darker) + lantern
-  c.fillStyle='#5d3a1e';
+  c.fillStyle='#7d8a72';
+  c.fillRect(-L*0.48,-W*0.62,L*0.84,W*1.24);
+  // stern deck (flat, darker) + lantern dot
+  c.fillStyle='#6a5a44';
   c.fillRect(-L*0.98,-W*0.5,L*0.22,W);
-  c.fillStyle=night?'#e8b923':'#f2c14e';
+  c.fillStyle=night?'#e8b923':'#d8a84e';
   c.beginPath(); c.arc(-L*0.92,0,0.07,0,7); c.fill();
-  // bow tip + wake
-  c.fillStyle='#f7f1de';
+  // bow tip
+  c.fillStyle='#efe8d2';
   c.beginPath(); c.moveTo(L*1.02,0); c.lineTo(L*0.88,-0.09); c.lineTo(L*0.88,0.09); c.closePath(); c.fill();
   c.restore();
 }
@@ -647,7 +656,7 @@ function roadAt(d){
     return [a[0]+(b[0]-a[0])*f, a[1]+(b[1]-a[1])*f, Math.atan2(b[1]-a[1],b[0]-a[0])];} d-=roadLen[i]; }
   return [D.road[0][0],D.road[0][1],0];
 }
-const CAR_COLORS=['#c0392b','#2e6fb0','#e8e4d8','#e8a020','#7a4a8a','#2e8a6a','#d86a2a','#5a6a7a'];
+const CAR_COLORS=['#a8543f','#5a7a8a','#cfc9b8','#c9a25a','#7a6a8a','#5a8a72','#b06a35','#6a7a72']; // muted low-poly palette
 const cars=[
   {d:0.04*roadTotal, v:1.15, lane:0, ci:0},
   {d:0.16*roadTotal, v:0.85, lane:0, ci:1},
@@ -659,26 +668,22 @@ const cars=[
   {d:0.91*roadTotal, v:0.7, lane:0, ci:7},
 ];
 function paintCar(c,x,y,ang,color){
+  // low-poly flat box car: soft shadow, one flat body tone, flat box cabin
+  // (light lid), 4 small wheels. No windshield bars, no rounded shading.
   c.save(); c.translate(x,y); c.rotate(ang);
   const L=0.55, W=0.26; // half-length / half-width in plane units (0.52 wide)
   // shadow
   c.fillStyle='rgba(38,60,53,0.25)';
   c.beginPath(); c.ellipse(0.03,0.05,L*0.95,W*0.95,0,0,7); c.fill();
-  // body
+  // body: flat box with slightly cut corners
   c.fillStyle=color;
   c.beginPath();
-  c.moveTo(L,0);
-  c.quadraticCurveTo(L*0.7,W, L*0.2,W);
-  c.lineTo(-L*0.7,W); c.quadraticCurveTo(-L,W*0.8, -L,W*0.4);
-  c.lineTo(-L,-W*0.4); c.quadraticCurveTo(-L,-W*0.8, -L*0.7,-W);
-  c.lineTo(L*0.2,-W); c.quadraticCurveTo(L*0.7,-W, L,0);
+  c.moveTo(L-0.08,-W); c.lineTo(-L+0.12,-W); c.lineTo(-L,-W+0.08); c.lineTo(-L,W-0.08);
+  c.lineTo(-L+0.12,W); c.lineTo(L-0.08,W); c.lineTo(L,W-0.06); c.lineTo(L,-W+0.06);
   c.closePath(); c.fill();
-  // roof + windshield (top-down)
-  c.fillStyle='rgba(255,255,255,0.85)';
-  c.fillRect(-L*0.25,-W*0.62,L*0.55,W*1.24);
-  c.fillStyle='rgba(38,60,53,0.55)';
-  c.fillRect(L*0.28,-W*0.55,0.08,W*1.1);
-  c.fillRect(-L*0.45,-W*0.55,0.08,W*1.1);
+  // cabin: smaller flat box, light lid
+  c.fillStyle='rgba(245,242,230,0.92)';
+  c.fillRect(-L*0.28,-W*0.6,L*0.56,W*1.2);
   // wheels
   c.fillStyle='#263c35';
   for(const [wx,wy] of [[L*0.55,W],[L*0.55,-W],[-L*0.55,W],[-L*0.55,-W]])

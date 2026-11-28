@@ -18,15 +18,22 @@ button:focus-visible,a:focus-visible{outline:2px solid var(--gold);outline-offse
 .mk i{font-style:normal;display:flex;align-items:center;justify-content:center;border-radius:50%;border:2px solid #fffdf6;box-shadow:0 0 0 1.5px rgba(38,60,53,.35),0 1px 4px rgba(38,60,53,.45)}
 .mk.major i{width:22px;height:22px;background:#2e5d43;color:#fff;font:700 11px/1 var(--sans)}
 .mk.minor i{width:14px;height:14px;background:#4a7a5c}
-.mk.peak i{width:22px;height:22px;background:#7a4a2b;color:#fff;font:700 11px/1 var(--sans);border-radius:4px}
+/* 2026-11-28 23:14: the two peaks (千层红山/依娜山） used to be brown
+   22px squares (.mk.peak) — user asked for the same green round dot as
+   the secondary spots, so peaks now take the 'minor' class (rule removed);
+   the 'peak' kind still exists in DATA (list group + card tag untouched). */
 .mk.gate i{width:20px;height:20px;background:var(--rust);color:#fff;font:700 11px/1 var(--sans);border-radius:4px}
 /* reference-style labels: dark-green vertical strips, white upright text.
-   Opacity is driven per-frame by positionMarkers() (--labelOp): the labels
-   fade in/out with zoom instead of popping, and stay hidden at the overview. */
-.mk span{position:absolute;left:26px;top:50%;transform:translateY(-50%);writing-mode:vertical-rl;text-orientation:upright;background:var(--green);color:#fff;font-size:10px;letter-spacing:1px;padding:7px 3px;border-radius:3px;box-shadow:0 1px 3px rgba(38,60,53,.3);display:none;white-space:nowrap;opacity:var(--labelOp,0)}
-/* label strip sits next to the dot: 22px pin (major/peak) -> left:26px,
+   Opacity + scale are driven per-frame by positionMarkers() (--labelOp /
+   --labelScale, set per .mk): when the 文字标注 switch is toggled the
+   labels fade and gently grow/shrink (0.92<->1, left-to-right stagger wave)
+   instead of popping. transform-origin left-center pins the strip's left
+   edge to the dot while it scales. */
+.mk span{position:absolute;left:26px;top:50%;transform:translateY(-50%) scale(var(--labelScale,1));transform-origin:left center;writing-mode:vertical-rl;text-orientation:upright;background:var(--green);color:#fff;font-size:10px;letter-spacing:1px;padding:7px 3px;border-radius:3px;box-shadow:0 1px 3px rgba(38,60,53,.3);display:none;white-space:nowrap;opacity:var(--labelOp,0)}
+/* label strip sits next to the dot: 22px pin (major) -> left:26px,
    20px gate dot -> left:25px, 14px minor dot -> left:23px (dot right edge
-   + 1px gap on the 30px button centred on the spot). */
+   + 1px gap on the 30px button centred on the spot). Peaks are minor dots
+   now (2026-11-28 23:14), so they take the 23px offset too. */
 .mk.minor span{left:23px}
 .mk.gate span{left:25px}
 #markers.labels .mk span{display:block}
@@ -104,7 +111,7 @@ button:focus-visible,a:focus-visible{outline:2px solid var(--gold);outline-offse
   #logoImg{height:20px}
   .chip{padding:5px 8px;font-size:11px}
   #hint{top:calc(106px + env(safe-area-inset-top));font-size:11px}
-  .dock{gap:1px;padding:5px}.dock button{padding:6px 3px;font-size:12px}.dock .zb{font-size:16px;padding:6px 6px} /* 2026-11-28 20:02 phone dock font -1px (was 13/17px) */ /* 2026-11-28 21:19 phone dock gap 2px→1px: the reordered dock was 4px wider than the 390px content box (scrollW 376 vs clientW 372) */
+  .dock{gap:1px;padding:5px}.dock button{padding:6px 3px;font-size:12px}.dock [data-v]{padding:6px 8px} /* 2026-11-28 23:16: section buttons back to the original horizontal ellipse (40x30 pill, was 30x30 circle after the 21:19 padding cut to 3px — user: "改成最开始的那个椭圆绿背景"); the 4 buttons gain 40px total, the dock still fits 390px (space-evenly absorbs it, overflow checked 0) */.dock .zb{font-size:16px;padding:6px 6px} /* 2026-11-28 20:02 phone dock font -1px (was 13/17px) */ /* 2026-11-28 21:19 phone dock gap 2px→1px: the reordered dock was 4px wider than the 390px content box (scrollW 376 vs clientW 372) */
   #labelBtn{padding:6px 4px;gap:4px}#labelBtn .lbl{font-size:10px} /* 2026-11-28 21:52 phone label text -2px (was 12px) */ #labelBtn .sw{width:30px;height:18px}#labelBtn .sw i{width:14px;height:14px}#labelBtn.on .sw i{left:14px} /* 2026-11-28 21:19 phone switch, compact so the dock fits 390px */
 }
 
@@ -1218,6 +1225,29 @@ function syncSectionBtn(){
   _curSec=s;
   document.querySelectorAll('.dock [data-v]').forEach(x=>x.classList.toggle('on',x.dataset.v===s));
 }
+// ---- label show/hide animation (2026-11-28 23:08, user: "文字标注开关要个
+// 舒服的出现/消失效果"): the 46 labels fade + gently scale (0.92<->1) with
+// a left-to-right stagger wave when the switch is toggled. Driven inside
+// positionMarkers() (runs every frame anyway) — no extra timers, no CSS
+// transitions to fight the per-frame updates: each .mk gets its own
+// --labelOp / --labelScale (the span inherits them), the stagger order is
+// snapshotted from screen x at toggle time. Dots/number pins untouched;
+// the button flips instantly. Total ~400ms (160ms wave + 240ms per-label
+// fade). 46 labels x 10-20ms per label would be a 700ms+ wave on its own,
+// so the stagger is a 160ms spread (~3.6ms per rank) — still a clear
+// left-to-right ripple, inside the 400ms budget.
+const LABEL_ANIM={fade:240,spread:160};
+const easeOutCubic=t=>1-Math.pow(1-t,3);
+const easeInCubic=t=>t*t*t;
+let labelAnim={from:1,to:1,start:0,active:false};
+let labelAnimVal=1; // master value (median label), used as `from` on a mid-flight reversal
+function startLabelAnim(){
+  const order=markerEls.map((el,i)=>[spotScreen(D.spots[i])[0],i]).sort((a,b)=>a[0]-b[0]);
+  const n=Math.max(1,D.spots.length-1);
+  order.forEach((o,rank)=>{markerEls[o[1]]._stagDelay=rank*(LABEL_ANIM.spread/n);});
+  labelAnim.from=labelAnimVal; labelAnim.to=labelOn?1:0;
+  labelAnim.start=performance.now(); labelAnim.active=true;
+}
 function positionMarkers(){
   // ---- label visibility (2026-11-28 22:40, user: "把所有的文字标注都显示出来"):
   // all 46 labels are ALWAYS ON whenever the 文字标注 switch is on
@@ -1232,9 +1262,23 @@ function positionMarkers(){
   // labels sit close together, but the user asked for all 46 to show.
   // Dots are untouched (all 46 spots have a dot); the labels' opacity
   // rides on --labelOp, set every frame here.
-  const labelOp=labelOn?1:0;
-  markersEl.classList.toggle('labels',labelOp>0.001);
-  markersEl.style.setProperty('--labelOp',labelOp.toFixed(3));
+  // ---- label show/hide animation (2026-11-28 23:08) ----
+  // The switch target rides on #markers --labelOp (the selftest reads it:
+  // it must be 1 whenever the switch is on). The visible fade is per-label
+  // (see the marker loop below). The `labels` class stays on while a hide
+  // animation is still running, so the fade-out is not cut off by
+  // display:none on the spans.
+  const now=performance.now();
+  if(labelAnim.active&&now-labelAnim.start>=LABEL_ANIM.spread+LABEL_ANIM.fade){
+    labelAnim.active=false; labelAnimVal=labelAnim.to;
+  }
+  if(labelAnim.active){
+    const qm=Math.min(1,Math.max(0,(now-labelAnim.start-LABEL_ANIM.spread/2)/LABEL_ANIM.fade));
+    const em=labelAnim.to===1?easeOutCubic(qm):easeInCubic(qm);
+    labelAnimVal=labelAnim.from+(labelAnim.to-labelAnim.from)*em;
+  }
+  markersEl.classList.toggle('labels',labelOn||labelAnim.active);
+  markersEl.style.setProperty('--labelOp',(labelOn?1:0).toFixed(3));
   for(let i=0;i<D.spots.length;i++){
     const el=markerEls[i], s=spotScreen(D.spots[i]);
     // all 46 spots have a dot (18:14 revert of the 17:56 no-dot rule), so
@@ -1242,7 +1286,19 @@ function positionMarkers(){
     if(s[0]<-40||s[0]>CW+40||s[1]<-40||s[1]>CH+40){el.style.display='none';continue;}
     el.style.display='flex';
     el.style.transform=`translate(${s[0]}px,${s[1]}px)`;
-    el.style.removeProperty('--labelOp'); // r12 per-marker override is gone
+    // per-label animated opacity + scale (idle: the final value, 1 or 0).
+    // Cached on the element so idle frames do no redundant style writes.
+    let v=labelAnim.to;
+    if(labelAnim.active){
+      const d=el._stagDelay||0;
+      const q=Math.min(1,Math.max(0,(now-labelAnim.start-d)/LABEL_ANIM.fade));
+      const e=labelAnim.to===1?easeOutCubic(q):easeInCubic(q);
+      v=labelAnim.from+(labelAnim.to-labelAnim.from)*e;
+    }
+    const vs=v.toFixed(3);
+    if(el._lop!==vs){el.style.setProperty('--labelOp',vs);el._lop=vs;}
+    const sc=(0.92+0.08*v).toFixed(3);
+    if(el._lsc!==sc){el.style.setProperty('--labelScale',sc);el._lsc=sc;}
     el.classList.remove('nolabel');
   }
   const me=$('#me');
@@ -1265,7 +1321,11 @@ function updateDistances(){
 const markerEls=[];
 D.spots.forEach((s,i)=>{
   const b=document.createElement('button');
-  const cls=s.kind==='peak'?'peak':s.kind==='gate'?'gate':s.level===1?'major':'minor';
+  // 2026-11-28 23:14: peaks (千层红山/依娜山） take the same green round
+  // dot as secondary spots ('minor') — the old brown-square 'peak' class
+  // is gone (user: "改成和其他二级点位一样的绿色圆点"). Kind/level/name/
+  // intro/popup are untouched (they still read s.kind==='peak').
+  const cls=s.kind==='gate'?'gate':s.level===1?'major':'minor';
   // 2026-11-28 levels: the 12 level-1 spots have a numbered pin (1-12,
   // s.lv); every other spot has a plain dot (18:14 revert of the 17:56
   // "only level 1 has a dot" rule — "全部都要那个点"). The label <span>
@@ -1404,11 +1464,13 @@ $('#locBtn').addEventListener('click',()=>{
 // defaults to ON and is not remembered).
 let labelOn=true;
 try{const v=localStorage.getItem('dongna_labels'); if(v==='0') labelOn=false;}catch(e){}
+labelAnimVal=labelOn?1:0; labelAnim.from=labelAnim.to=labelAnimVal; // no animation on load — start at the stored state
 function setLabelOn(v,save){
   labelOn=v;
   const b=$('#labelBtn');
   b.classList.toggle('on',v); /* 2026-11-28 21:19: no textContent here — the switch markup lives inside the button now */
   if(save!==false){try{localStorage.setItem('dongna_labels',v?'1':'0');}catch(e){}}
+  startLabelAnim(); // 2026-11-28 23:08: gentle fade+scale wave (button flips instantly)
   positionMarkers();
 }
 window.DONGNA.setLabelOn=setLabelOn;

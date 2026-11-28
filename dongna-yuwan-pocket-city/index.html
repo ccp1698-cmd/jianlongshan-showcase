@@ -103,14 +103,12 @@ button:focus-visible,a:focus-visible{outline:2px solid var(--gold);outline-offse
 .ndist{margin-left:auto;flex:none;color:var(--green);font-weight:700;font-size:13px;white-space:nowrap}
 .nintro{font-size:12.5px;line-height:1.55;color:var(--ink);margin-top:4px}
 .nloc{font-size:11.5px;color:var(--muted);margin-top:2px}
-#hint{position:fixed;left:50%;transform:translateX(-50%);top:calc(64px + env(safe-area-inset-top));z-index:5;font-size:12px;color:var(--muted);background:rgba(255,253,246,.9);border:1px solid #e3ddc8;border-radius:14px;padding:4px 10px;pointer-events:none;white-space:nowrap}
 #selftest{display:none}
 @media (min-width:760px){#card{bottom:76px}}
 @media (max-width:600px){
   .topbar{flex-wrap:wrap;gap:6px}
   #logoImg{height:20px}
   .chip{padding:5px 8px;font-size:11px}
-  #hint{top:calc(106px + env(safe-area-inset-top));font-size:11px}
   .dock{gap:1px;padding:5px}.dock button{padding:6px 3px;font-size:12px}.dock [data-v]{padding:6px 8px} /* 2026-11-28 23:16: section buttons back to the original horizontal ellipse (40x30 pill, was 30x30 circle after the 21:19 padding cut to 3px — user: "改成最开始的那个椭圆绿背景"); the 4 buttons gain 40px total, the dock still fits 390px (space-evenly absorbs it, overflow checked 0) */.dock .zb{font-size:16px;padding:6px 6px} /* 2026-11-28 20:02 phone dock font -1px (was 13/17px) */ /* 2026-11-28 21:19 phone dock gap 2px→1px: the reordered dock was 4px wider than the 390px content box (scrollW 376 vs clientW 372) */
   #labelBtn{padding:6px 4px;gap:4px}#labelBtn .lbl{font-size:10px} /* 2026-11-28 21:52 phone label text -2px (was 12px) */ #labelBtn .sw{width:30px;height:18px}#labelBtn .sw i{width:14px;height:14px}#labelBtn.on .sw i{left:14px} /* 2026-11-28 21:19 phone switch, compact so the dock fits 390px */
 }
@@ -128,7 +126,6 @@ button:focus-visible,a:focus-visible{outline:2px solid var(--gold);outline-offse
   <div class="ttl"><img id="logoImg" alt="峒那屿湾"></div>
   <button class="chip" id="nearbyBtn">📍 附近景区推荐</button>
 </div>
-<div id="hint">横版俯视 · 拖动平移 · 滚轮 / 双指缩放 · 点圆点看介绍</div>
 <div class="dock">
   <span class="grp">
     <button data-v="all" class="on">全景</button>

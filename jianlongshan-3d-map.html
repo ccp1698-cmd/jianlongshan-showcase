@@ -234,7 +234,7 @@ a{color:#9fc6a8;text-underline-offset:2px}
     <b>四季</b> —— 崇左属亚热带湿润季风区，年均 21–22℃，无霜期 330 天以上，年雨量约 1200 mm，雨季 4–9 月占全年近八成，春季多干旱：这里是“长夏无冬、四季常青”，所以不用温带春夏秋冬。<a href="https://www.weather.com.cn/cityintro/101300201.shtml" target="_blank" rel="noopener">中国天气网 · 崇左城市介绍 ↗</a><br>
   </div>
   <div class="foot">
-    地形：SRTM / Terrarium DEM · 山路：© OpenStreetMap contributors (ODbL) · 树木放大 ×4 以便看清 · 山脊最高 730 m（天柱峰）· 微缩模型 v2.11.28 · <span>3D 模型：Polyfork（CC BY 4.0）</span>
+    地形：SRTM / Terrarium DEM · 山路：© OpenStreetMap contributors (ODbL) · 树木放大 ×4 以便看清 · 山脊最高 730 m（天柱峰）· 微缩模型 v2.11.29 · <span>3D 模型：Polyfork（CC BY 4.0）</span>
   </div>
 </div>
 <div class="sheet" id="sheet-info" hidden>
@@ -1308,7 +1308,6 @@ const viewMarkers={};
 // plus a faint stroke — see the #leaderLines CSS). This is an L2-only
 // relaxation of the v2.10.3 rule (no vertical stagger, no leader lines)
 // — v2.11.2 relaxed the stagger, v2.11.6 relaxes the leader lines.
-// v2.11.28: vertical stagger for the entrance cluster, four labels always opaque (user 2026-11-28) — the three entrance labels stack vertically via fixed _stag offsets (-60/-30/0, no leader lines; the v2.11.27 fan-out is removed); the park exit, entrance, visitor centre and plaza stay fully opaque at every zoom.
 const _leaderSvg=document.createElementNS('http://www.w3.org/2000/svg','svg');
 _leaderSvg.setAttribute('id','leaderLines');
 document.getElementById('markers').appendChild(_leaderSvg);
@@ -1351,10 +1350,10 @@ function addMarker(lon,lat,yOff,html,cls,onClick,off){
   // v2.11.23: the fade extends to every non-peak marker (user:
   // "除了四座山峰，其它都用这个效果。越远越透明") — peaks keep 1.0,
   // all other markers take the distance factor, L1 or L2 alike.
-  // Always-opaque: _opaque is true for the four peaks and for
-  // the four entrance/exit labels (off.opaque); it is read at the three
-  // opacity sites (init here, fadeMarker, updateMarkers) and for the
-  // leader lines, so the pill and its line always agree.
+  // v2.11.29: _opaque is true for the four peaks and for the four
+  // entrance/exit labels (off.opaque); it is read at the three opacity
+  // sites (init here, fadeMarker, updateMarkers). Ported from
+  // v2.11.27's isOpaque; the fan-out is NOT ported.
   const _opaque=cls.indexOf('peak')>=0||!!(off&&off.opaque);
   el.style.opacity=_hidTier?'0':(_opaque?'1':String(distOpacity())); el.style.pointerEvents=_hidTier?'none':'auto';
   // v2.10: vertical stagger CANCELLED (user: "取消垂直错开") — the v2.9.9
@@ -1396,18 +1395,11 @@ function addMarker(lon,lat,yOff,html,cls,onClick,off){
     // v2.11.23: isPeak — the four peaks (class 'peak') keep opacity 1.0
     // at every distance; every other marker takes distOpacity().
     isPeak:cls.indexOf('peak')>=0,
-    // isOpaque — peaks plus the four entrance/exit labels (off.opaque)
-    // keep opacity 1.0 at every distance; the other 20 markers take
-    // distOpacity().
-    // _stag is the fixed-pixel vertical stagger (L2 alternates
-    // -10 / +10 in creation order; the three entrance labels carry
-    // explicit values via off.stag — 登山入口 -60, 访客中心 -30,
-    // 访客集散广场 0 — so the three pills stack vertically above the
-    // entrance cluster with a comfortable gap; the v2.11.27 fan-out
-    // (fan-out offsets + leader lines) is removed. The anchor
-    // itself never moves; only the pill's screen y shifts.
+    // v2.11.29: isOpaque — peaks plus the four entrance/exit labels
+    // (off.opaque) keep opacity 1.0 at every distance; the other 20
+    // markers take distOpacity().
     isOpaque:_opaque,
-    _stag:(off&&off.stag!==undefined&&off.stag!==null)?off.stag:(cls.indexOf('lv2')>=0?(_l2StagN++%2===0?-10:10):0),
+    _stag:cls.indexOf('lv2')>=0?(_l2StagN++%2===0?-10:10):0,
     // v2.11.6: the marker's leader line (L2 only, null for L1); the
     // endpoints are recorded on _lx1/_ly1 (pill end) and _lx2/_ly2
     // (anchor end) every frame in updateMarkers, for the tests.
@@ -1462,11 +1454,11 @@ document.getElementById('markers').appendChild(_hintEl);
 viewMarkers.entrance=addMarker(DATA.entrance.lon,DATA.entrance.lat,0.9,'登山入口','lv1',()=>{
   showDetail('登山入口','海拔约 488 m','',DATA.entrance.photo);
   flyTo(DATA.entrance.lon,DATA.entrance.lat,9);
-},{opaque:true,stag:-60}); // vertical stagger -60 (top of the entrance stack, measured panorama/mid/close — no overlap); v2.11.27 fan-out (-70,-40) + leader line removed; always opaque (entrance cluster)
+},{opaque:true}); // v2.9.8: fan-out dx 70/dy -20 removed (tuned for the old position); always opaque (v2.11.29)
 viewMarkers.parkexit=addMarker(DATA.park_exit.lon,DATA.park_exit.lat,0.9,'园区出口','lv1',()=>{
   showDetail('园区出口','海拔约 498 m','沿息穹坡下山，即可抵达园区出口。',DATA.park_exit.photo);
   flyTo(DATA.park_exit.lon,DATA.park_exit.lat,9);
-},{opaque:true}); // v2.9.8: fan-out dx -20/dy 20 removed; position per KML (v2.7.1 red-circle location superseded); always opaque (entrance/exit set)
+},{opaque:true}); // v2.9.8: fan-out dx -20/dy 20 removed; position per KML (v2.7.1 red-circle location superseded); always opaque (v2.11.29)
 /* v2.9.8: the visitor plaza and the emergency exit are Level 1 (always
    visible). They moved out of DATA.waypoints (now the 13 KML waypoints,
    Level 2) into their own DATA fields. The plaza's old fan-out dx 40/dy -55
@@ -1475,7 +1467,7 @@ viewMarkers.parkexit=addMarker(DATA.park_exit.lon,DATA.park_exit.lat,0.9,'园区
    lift is 1.4 like the other non-peak labels — it anchors above its point. */
 addMarker(DATA.plaza.lon,DATA.plaza.lat,0.9,'访客集散广场 <span class="star">★</span>','lv1',()=>{ // v2.10.1: gold star (same ★ as the 天柱峰 ★ view button)
   showDetail(DATA.plaza.label,'',DATA.plaza.text,DATA.plaza.photo); flyTo(DATA.plaza.lon,DATA.plaza.lat,9);
-},{dx:DATA.plaza.dx||0,dy:DATA.plaza.dy||0,opaque:true,stag:0}); // vertical stagger 0 (bottom of the entrance stack, natural position); v2.11.27 fan-out (0,-16) + leader line removed; always opaque (entrance cluster)
+},{dx:DATA.plaza.dx||0,dy:DATA.plaza.dy||0,opaque:true}); // v2.10: stagger cancelled, back above its point; always opaque (v2.11.29)
 addMarker(DATA.emergency_exit.lon,DATA.emergency_exit.lat,1.4,'应急出口','lv1',()=>{
   showDetail(DATA.emergency_exit.label,'',DATA.emergency_exit.text,DATA.emergency_exit.photo); flyTo(DATA.emergency_exit.lon,DATA.emergency_exit.lat,9);
 },{dx:DATA.emergency_exit.dx||0,dy:DATA.emergency_exit.dy||0}); // v2.10: stagger cancelled; DATA dx/dy zeroed (was -50/35) — anchors above its point, yOff 1.4 (~10 px gap)
@@ -1495,7 +1487,7 @@ const MED_ICO='<svg width="12" height="12" viewBox="0 0 12 12" style="vertical-a
   const cls=(w.label==='访客中心'?'lv1':'wp lv2')+(w.vert?' vert':'');
   addMarker(w.lon,w.lat,1.4,w.label+(facHtml?' '+facHtml:''),cls,()=>{
     showDetail(w.label,'',w.text,w.photo); flyTo(w.lon,w.lat,11);
-  },w.label==='访客中心'?{dx:0,dy:0,opaque:true,stag:-30}:{dx:w.dx||0,dy:w.dy||0}); // vertical stagger -30 (middle of the entrance stack); v2.11.27 fan-out (+84,-40) + leader line removed; always opaque for the visitor centre (entrance cluster)
+  },w.label==='访客中心'?{dx:0,dy:0,opaque:true}:{dx:w.dx||0,dy:w.dy||0}); // always opaque for the visitor centre (v2.11.29)
 });
 // v2.9.8: 3 KML parking lots (Level 2 since v2.10.14 — L3 merged into L2,
 // 'park' class, hidden when size>34; was Level 3, hidden past 30).
@@ -2359,16 +2351,13 @@ function distOpacity(){
 // factor (user: "一级按钮标注去掉透明效果").
 // v2.11.23: peaks keep target '1'; every other marker takes the distance
 // factor (user: "除了四座山峰，其它都用这个效果。越远越透明").
-// v2.11.27: the target is '1' for every always-opaque marker (peaks +
-// the four entrance/exit labels); the other 20 take the factor.
 function fadeMarker(m,show){
   m._vis=show;
   if(show){m.el.style.opacity=m.isOpaque?'1':String(distOpacity());m.el.style.pointerEvents='auto';}
   else{m.el.style.opacity='0';m.el.style.pointerEvents='none';}
   // v2.11.6: the leader line fades with its pill (same target — the
   // distance factor when visible, 0 when hidden). L1 has no line, so
-  // this only ever fires for L2 — except the three fanned L1 labels,
-  // whose lines fade with their (always-opaque) pills.
+  // this only ever fires for L2.
   if(m._line)m._line.style.opacity=show?(m.isOpaque?'1':String(distOpacity())):'0';
 }
 // v2.10.6: terrain-occlusion state, refreshed throttled (see
@@ -2467,8 +2456,8 @@ function updateMarkers(){
     // distance factor. A hidden marker (m._vis false) keeps opacity 0
     // and is never written.
     // v2.11.23: peaks retarget to '1'; every other marker follows the
-    // distance factor.
-    // v2.11.27: always-opaque markers retarget to '1' (pill and line).
+    // distance factor. v2.11.29: the four entrance/exit labels retarget
+    // to '1' too (isOpaque).
     if(m._vis)m.el.style.opacity=m.isOpaque?'1':String(distOpacity());
     // v2.11.6: the leader line retargets with its pill every frame
     // (same distance factor); a hidden marker (m._vis false) keeps
@@ -2503,11 +2492,6 @@ function updateMarkers(){
     // y (m._stag, assigned in addMarker, alternating in creation order).
     // The ANCHOR never moves (the PIN probes measure anchor + _stag);
     // L1 keeps _stag 0, i.e. still pinned directly above its point.
-    // Fan-out (v2.11.27) REMOVED — the three entrance
-    // labels now stagger vertically via _stag instead (see addMarker);
-    // there are no fan-out offsets any more, and no leader lines
-    // for L1. The ANCHOR never moves (lx0/ay below); only the pill's
-    // screen y shifts by _stag.
     const lx0=(v3.x*0.5+0.5)*w+(m.dx||0)*s;
     // v2.11.6: ay is the anchor's screen y — the pill's bottom edge
     // sits at ay - liftPx + _stag, and the leader line runs from the

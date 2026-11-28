@@ -41,12 +41,23 @@ button:focus-visible,a:focus-visible{outline:2px solid var(--gold);outline-offse
 .chip{background:rgba(255,253,246,.94);border:1px solid #ddd6c0;border-radius:20px;padding:6px 10px;font-size:12px;box-shadow:0 1px 6px rgba(38,60,53,.15)}
 .chip.on{background:var(--green);color:#fff;border-color:var(--green)}
 #nearbyBtn{margin-left:auto}
-.dock{position:fixed;left:8px;right:8px;bottom:calc(10px + env(safe-area-inset-bottom));z-index:10;display:flex;gap:6px;align-items:center;justify-content:flex-start;background:rgba(255,253,246,.95);border:1px solid #ddd6c0;border-radius:24px;padding:6px;box-shadow:0 2px 10px rgba(38,60,53,.2);overflow-x:auto}
+.dock{position:fixed;left:8px;right:8px;bottom:calc(10px + env(safe-area-inset-bottom));z-index:10;display:flex;gap:6px;align-items:center;justify-content:space-evenly;background:rgba(255,253,246,.95);border:1px solid #ddd6c0;border-radius:24px;padding:6px;box-shadow:0 2px 10px rgba(38,60,53,.2);overflow-x:auto} /* 2026-11-28 21:19 dock reorder: buttons evenly spread across the box (was flex-start, bunched left) */
 .dock button{white-space:nowrap;padding:7px 11px;border-radius:18px;font-size:14px} /* 2026-11-28 20:02 dock font -1px (was 15px) */
-.dock button.on{background:var(--green);color:#fff}
-#labelBtn:not(.on){background:#e8e6de;color:#8a8778}
+.dock [data-v].on{background:var(--green);color:#fff} /* 2026-11-28 21:19 scoped to section buttons: #labelBtn is a switch now, it must not turn into a green pill */
+.dock .grp{display:flex;align-items:center;gap:2px;flex:none}
 .dock .sep{width:1px;height:22px;background:#ddd6c0;flex:none}
 .dock .zb{font-size:18px;padding:7px 10px} /* 2026-11-28 20:02 dock +/- -1px (was 19px) */
+#listBtn .lic{font-size:13px}
+/* 2026-11-28 21:19 label toggle switch (user: "文字标注" as a switch — on-state
+   looks on, off-state looks off) + glow when ON */
+#labelBtn{display:inline-flex;align-items:center;gap:6px;padding:7px 8px}
+#labelBtn .lbl{color:var(--green);font-weight:700}
+#labelBtn .sw{flex:none;width:34px;height:20px;border-radius:999px;background:#c9c6b8;position:relative;transition:background .2s;box-shadow:inset 0 1px 2px rgba(0,0,0,.2)}
+#labelBtn .sw i{position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.35);transition:left .2s}
+#labelBtn.on .sw{background:var(--green);box-shadow:0 0 9px 2px rgba(46,93,67,.6),inset 0 1px 2px rgba(0,0,0,.2)} /* switch track itself glows too */
+#labelBtn.on .sw i{left:16px}
+#labelBtn.on{box-shadow:0 0 12px 3px rgba(46,93,67,.6),0 0 30px 10px rgba(46,93,67,.32)} /* glow when ON: obvious halo so it lights up */
+#labelBtn:not(.on) .lbl{color:#8a8778}
 #card{position:fixed;left:50%;transform:translate(-50%,calc(100% + 90px));bottom:calc(64px + env(safe-area-inset-bottom));z-index:20;width:min(430px,calc(100vw - 24px));background:var(--card);border:1px solid #ddd6c0;border-radius:16px;box-shadow:0 8px 30px rgba(38,60,53,.3);padding:14px 16px 12px;transition:transform .28s ease}
 #card.show{transform:translate(-50%,0)}
 #card h2{font:700 19px/1.3 var(--serif);padding-right:28px}
@@ -93,7 +104,8 @@ button:focus-visible,a:focus-visible{outline:2px solid var(--gold);outline-offse
   #logoImg{height:20px}
   .chip{padding:5px 8px;font-size:11px}
   #hint{top:calc(106px + env(safe-area-inset-top));font-size:11px}
-  .dock{gap:2px;padding:5px}.dock button{padding:6px 3px;font-size:12px}.dock .zb{font-size:16px;padding:6px 6px} /* 2026-11-28 20:02 phone dock font -1px (was 13/17px) */
+  .dock{gap:1px;padding:5px}.dock button{padding:6px 3px;font-size:12px}.dock .zb{font-size:16px;padding:6px 6px} /* 2026-11-28 20:02 phone dock font -1px (was 13/17px) */ /* 2026-11-28 21:19 phone dock gap 2px→1px: the reordered dock was 4px wider than the 390px content box (scrollW 376 vs clientW 372) */
+  #labelBtn{padding:6px 4px;gap:4px}#labelBtn .sw{width:30px;height:18px}#labelBtn .sw i{width:14px;height:14px}#labelBtn.on .sw i{left:14px} /* 2026-11-28 21:19 phone switch, compact so the dock fits 390px */
 }
 
 #logoImg{height:26px;width:auto;display:block}
@@ -111,18 +123,22 @@ button:focus-visible,a:focus-visible{outline:2px solid var(--gold);outline-offse
 </div>
 <div id="hint">横版俯视 · 拖动平移 · 滚轮 / 双指缩放 · 点圆点看介绍</div>
 <div class="dock">
-  <button data-v="all" class="on">全景</button>
-  <button data-v="west">西段</button>
-  <button data-v="mid">中段</button>
-  <button data-v="east">东段</button>
+  <span class="grp">
+    <button data-v="all" class="on">全景</button>
+    <button data-v="west">西段</button>
+    <button data-v="mid">中段</button>
+    <button data-v="east">东段</button>
+  </span>
   <span class="sep"></span>
-  <button class="zb" id="zin">＋</button>
-  <button class="zb" id="zout">－</button>
-  <button id="reset">复位</button>
+  <button id="listBtn">景点 <span class="lic">☰</span></button>
   <span class="sep"></span>
-  <button id="listBtn">景点 46</button>
+  <span class="grp">
+    <button class="zb" id="zin">＋</button>
+    <button class="zb" id="zout">－</button>
+    <button id="reset">复位</button>
+  </span>
   <span class="sep"></span>
-  <button id="labelBtn" class="on">标注文字</button>
+  <button id="labelBtn" class="on"><span class="lbl">标注文字</span><span class="sw"><i></i></span></button>
 </div>
 <div id="card"><button id="cardX" aria-label="关闭">×</button><h2 id="cardT"></h2><span class="tag" id="cardTag"></span><p id="cardP"></p><div class="route" id="cardR" style="display:none"></div></div>
 <div id="list"><header><b>景点</b><span id="listCount"></span><button id="listX" aria-label="关闭">×</button></header><div class="locrow"><button id="locBtn">◎ 定位</button><span id="locMsg"></span></div><div class="rows" id="listRows"></div></div>
@@ -817,6 +833,8 @@ function defaultParams(){
   // height; the ends crop a little on narrow screens — pinch out to see
   // the whole map). Shared by defaultView() and the label-visibility rule
   // in positionMarkers(), so both agree on what "the overview" is.
+  // (2026-11-28: the 全景 button no longer uses this — it uses the true
+  // fit-all, the user's 21:08 reference. This stays the opening / reset view.)
   const fit=fitZoom();
   const zT=Math.max(fit, Math.min(0.75*CH/(_cb.y1-_cb.y0), fit*8));
   return {cx:(_cb.x0+_cb.x1)/2, cy:(_cb.y0+_cb.y1)/2, z:zT, fit};
@@ -825,7 +843,15 @@ function defaultView(animate){
   const p=defaultParams();
   setCam(p.cx, p.cy, p.z, animate);
 }
-function fitAll(animate){defaultView(animate);}
+function fitAll(animate){
+  // 2026-11-28: the 全景 button's view is the true fit-all (the user's
+  // 21:08 reference: the whole map as a thin band across the full width,
+  // west dots at the left edge, 千层红山 at the right edge) — content
+  // centre + fitZoom(). The default opening view stays the tightened
+  // overview (defaultView/defaultParams, middle close-up); it is no
+  // longer the same as the 全景 view.
+  setCam((_cb.x0+_cb.x1)/2,(_cb.y0+_cb.y1)/2,fitZoom(),animate);
+}
 function setCam(cx,cy,z,animate){
   // z is screen CSS px per plane unit (default view ~17-20, fit-all ~3-9),
   // so the clamp is [fitZoom,MAXZOOM] — the old [0.5,100] let the map shrink
@@ -1201,15 +1227,18 @@ const _secMidX=(D.views.west.plane[0]+D.views.mid.plane[0])/2;
 // centres — the same split the label rules use), the mid/east split is
 // _secEastX (97.5, midpoint of the mid and east view centres). 全景 when
 // the camera is zoomed out to (near) the fit-all level — the section views
-// are at fit*2.11/2.9/2.28, so fit*1.5 sits cleanly below them — or when
-// it is sitting on the default overview itself (the 全景 button's view).
+// are at fit*2.11/2.9/2.28, so fit*1.5 sits cleanly below them.
+// 2026-11-28 (r19 follow-up): the old second rule — "sitting on the
+// default overview also counts as 全景" — is gone. The 全景 button now
+// goes to the true fit-all (z=2.798) while the default opening / reset
+// view is the middle close-up (z=13.391, centre x≈68, i.e. in the mid
+// section), so that rule wrongly showed 全景 at startup. The green now
+// follows the camera's actual position only: startup/reset → 中段,
+// tap 全景 (fit-all) → 全景.
 const _secEastX=(D.views.mid.plane[0]+D.views.east.plane[0])/2;
 function currentSection(){
   const fit=fitZoom();
   if(cam.tz<=fit*1.5) return 'all';
-  const dp=defaultParams();
-  const dx=Math.abs(cam.tx-dp.cx)/(CW/cam.tz);
-  if(dx<0.35&&Math.abs(Math.log(cam.tz/dp.z))<0.25) return 'all';
   if(cam.tx<_secMidX) return 'west';
   if(cam.tx<_secEastX) return 'mid';
   return 'east';
@@ -1375,7 +1404,7 @@ D.spots.forEach((s,i)=>{
   b.addEventListener('click',e=>{e.stopPropagation();openSpot(i);});
   markersEl.appendChild(b); markerEls.push(b);
 });
-$('#listBtn').textContent='景点 '+D.spots.length;
+$('#listBtn').innerHTML='景点 <span class="lic">☰</span>'; /* 2026-11-28 21:19: the "46" count is now a list icon (was textContent '景点 46') */
 $('#listCount').textContent='共 '+D.spots.length+' 处 · 点行可定位';
 (function buildList(){
   const rows=$('#listRows');
@@ -1492,18 +1521,18 @@ $('#locBtn').addEventListener('click',()=>{
 // 2026-11-28 label switch ("加个开关" + 17:54 "标注文字按钮"): a dock
 // button toggles the text labels. ON (default): labels follow the existing
 // labelOp rules (zoomFade/gate). OFF: no label text at any zoom — the dots
-// and number pins always stay. The button is labelled "标注文字" and shows
-// its state by colour: dark green (.on) when on, grey when off. It applies
-// immediately (positionMarkers) and is remembered in localStorage
-// (try/catch: file:// and some WebViews throw, then it just defaults to ON
-// and is not remembered).
+// and number pins always stay. The button is labelled "标注文字" with a
+// toggle switch (2026-11-28 21:19: was a green pill): ON shows the knob
+// flipped right on a green track + a glow, OFF shows it flipped left on a
+// grey track. It applies immediately (positionMarkers) and is remembered in
+// localStorage (try/catch: file:// and some WebViews throw, then it just
+// defaults to ON and is not remembered).
 let labelOn=true;
 try{const v=localStorage.getItem('dongna_labels'); if(v==='0') labelOn=false;}catch(e){}
 function setLabelOn(v,save){
   labelOn=v;
   const b=$('#labelBtn');
-  b.classList.toggle('on',v);
-  b.textContent='标注文字';
+  b.classList.toggle('on',v); /* 2026-11-28 21:19: no textContent here — the switch markup lives inside the button now */
   if(save!==false){try{localStorage.setItem('dongna_labels',v?'1':'0');}catch(e){}}
   positionMarkers();
 }
@@ -1514,11 +1543,10 @@ document.querySelectorAll('.dock [data-v]').forEach(b=>b.addEventListener('click
 }));
 $('#zin').addEventListener('click',()=>setCam(cam.tx,cam.ty,cam.tz*1.35,true));
 $('#zout').addEventListener('click',()=>setCam(cam.tx,cam.ty,cam.tz/1.35,true));
-$('#reset').addEventListener('click',()=>{fitAll(true);$('#card').classList.remove('show');clearRoute();});
+$('#reset').addEventListener('click',()=>{defaultView(true);$('#card').classList.remove('show');clearRoute();});
 $('#labelBtn').addEventListener('click',()=>setLabelOn(!labelOn));
 // initial button state (button only — positionMarkers runs on the first frame)
 $('#labelBtn').classList.toggle('on',labelOn);
-$('#labelBtn').textContent='标注文字';
 // 2026-11-28: rotation removed — the rotate buttons and compass are gone
 // (user: "把旋转给去掉", map stays north-up); no rotation entry point remains.
 // ---- pan / pinch (zoom only — twist no longer rotates) / wheel ----
@@ -1775,7 +1803,7 @@ function tick(now){
 const errors=[];
 window.addEventListener('error',e=>errors.push(String(e.message)));
 resize();
-fitAll(false);
+defaultView(false);
 document.getElementById('logoImg').src=D.logo; // official logo, top-left
 window.addEventListener('resize',resize);
 // WeChat/iOS: visual-viewport changes (toolbar show/hide) do not always

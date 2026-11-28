@@ -930,18 +930,26 @@ window.DONGNA={
   lonLatToScreen, screenToLonLat, realToPlane, planeToReal,
 };
 function positionMarkers(){
-  // ---- label visibility (2026-11-28): text labels by zoom level, smooth fade.
-  // Two factors, multiplied (both 0..1):
-  // (a) zoom fade: labels fade in as the visible width shrinks from ~73 to
-  // ~66 plane units (r = cam.z/fitZoom 1.95 -> 2.15). Below that the view
-  // shows so much of the map that the 68 labels crowd each other.
-  // (b) overview proximity: a pure zoom threshold CANNOT tell the overview
-  // from a close-up on portrait phones — the phone default view (r ~6.6) is
-  // MORE zoomed than the section views (west 2.16, mid 2.97, east 2.33) and
-  // about as zoomed as the island close-up (r ~4.5). So labels also fade
-  // out near the default view itself (what 全景 returns to): proximity 1
-  // at the default centre/zoom, fading to 0 once the camera has moved ~8
-  // plane units away or the zoom differs by ~35%.
+  // ---- label visibility (2026-11-28, 2nd round): text labels by zoom level.
+  // The 1st round failed on phones: its prox released the labels after one
+  // pinch (zoom +42% > 35% tolerance) or after panning to the island
+  // (distC > 8). Measured on a 390x844 phone viewport (default z 18.08,
+  // centre (70, 22.5), visible width 21.6):
+  //   default            q=1.00 distC=0    0 labels
+  //   1 moderate pinch   q=1.42 distC=0    3 labels (must be 0)
+  //   2 moderate pinches q=2.02 distC=0    2 labels (must be 0)
+  //   pan to island, no zoom  q=1.00 distC=35.3  18 labels, visibly messy (must be 0)
+  //   island close-up (user's 13:22 screenshot view) q=1.16 distC=35.3  15 labels (must be on)
+  // So on a portrait phone the default and the close-up are only ~16% apart
+  // in zoom — no zoom-only threshold can separate "one pinch" from the
+  // close-up. Labels therefore show only in two bands (smoothstep fades):
+  // (A) wide section views: visible width >= ~47 (west 66 / mid 48 / east
+  //     61 — identical on phone and desktop; the desktop default stays
+  //     label-free because zoomFade is ~0 there, and prox covers it too).
+  // (B) the island close-up: zoomed to q >= ~1.16 vs the default AND
+  //     centred far from the default centre (distC >= ~35). One or two
+  //     pinches from the default (q <= ~2, distC <= ~22 even when the pinch
+  //     is anchored on the island) reach neither band, so no labels.
   // Dots are untouched (all 68 stay, minor dots keep the old fit*1.05 rule);
   // the labels' opacity rides on --labelOp, set every frame here, so the
   // fade follows the camera with no pop and no CSS-transition lag.
@@ -952,7 +960,13 @@ function positionMarkers(){
   const dp=defaultParams();
   const distC=Math.max(Math.abs(cam.cx-dp.cx),Math.abs(cam.cy-dp.cy));
   const prox=Math.max(0,1-distC/8)*Math.max(0,1-Math.abs(cam.z-dp.z)/(0.35*dp.z));
-  const labelOp=zoomFade*(1-prox);
+  const ss=(x,a,b)=>{const t=Math.max(0,Math.min(1,(x-a)/(b-a)));return t*t*(3-2*t);};
+  const visW=CW/cam.z;
+  const q=cam.z/dp.z;
+  const bandA=ss(visW,42,47); // wide section views
+  const bandB=ss(q,1.05,1.16)*ss(distC,25,35); // island close-up
+  const gate=Math.max(bandA,bandB);
+  const labelOp=zoomFade*(1-prox)*gate;
   markersEl.classList.toggle('labels',labelOp>0.001);
   markersEl.style.setProperty('--labelOp',labelOp.toFixed(3));
   const cands=[];

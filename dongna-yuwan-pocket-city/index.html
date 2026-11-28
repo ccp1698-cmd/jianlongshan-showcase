@@ -42,11 +42,11 @@ button:focus-visible,a:focus-visible{outline:2px solid var(--gold);outline-offse
 .chip.on{background:var(--green);color:#fff;border-color:var(--green)}
 #nearbyBtn{margin-left:auto}
 .dock{position:fixed;left:8px;right:8px;bottom:calc(10px + env(safe-area-inset-bottom));z-index:10;display:flex;gap:6px;align-items:center;justify-content:flex-start;background:rgba(255,253,246,.95);border:1px solid #ddd6c0;border-radius:24px;padding:6px;box-shadow:0 2px 10px rgba(38,60,53,.2);overflow-x:auto}
-.dock button{white-space:nowrap;padding:7px 11px;border-radius:18px;font-size:15px}
+.dock button{white-space:nowrap;padding:7px 11px;border-radius:18px;font-size:14px} /* 2026-11-28 20:02 dock font -1px (was 15px) */
 .dock button.on{background:var(--green);color:#fff}
 #labelBtn:not(.on){background:#e8e6de;color:#8a8778}
 .dock .sep{width:1px;height:22px;background:#ddd6c0;flex:none}
-.dock .zb{font-size:19px;padding:7px 10px}
+.dock .zb{font-size:18px;padding:7px 10px} /* 2026-11-28 20:02 dock +/- -1px (was 19px) */
 #card{position:fixed;left:50%;transform:translate(-50%,calc(100% + 90px));bottom:calc(64px + env(safe-area-inset-bottom));z-index:20;width:min(430px,calc(100vw - 24px));background:var(--card);border:1px solid #ddd6c0;border-radius:16px;box-shadow:0 8px 30px rgba(38,60,53,.3);padding:14px 16px 12px;transition:transform .28s ease}
 #card.show{transform:translate(-50%,0)}
 #card h2{font:700 19px/1.3 var(--serif);padding-right:28px}
@@ -90,7 +90,7 @@ button:focus-visible,a:focus-visible{outline:2px solid var(--gold);outline-offse
   #logoImg{height:20px}
   .chip{padding:5px 8px;font-size:11px}
   #hint{top:calc(106px + env(safe-area-inset-top));font-size:11px}
-  .dock{gap:2px;padding:5px}.dock button{padding:6px 3px;font-size:13px}.dock .zb{font-size:17px;padding:6px 6px}
+  .dock{gap:2px;padding:5px}.dock button{padding:6px 3px;font-size:12px}.dock .zb{font-size:16px;padding:6px 6px} /* 2026-11-28 20:02 phone dock font -1px (was 13/17px) */
 }
 
 #logoImg{height:26px;width:auto;display:block}
@@ -1162,14 +1162,21 @@ function positionMarkers(){
   //   island close-up (user's 13:22 screenshot view) q=1.16 distC=35.3  15 labels (must be on)
   // So on a portrait phone the default and the close-up are only ~16% apart
   // in zoom — no zoom-only threshold can separate "one pinch" from the
-  // close-up. Labels therefore show only in two bands (smoothstep fades):
-  // (A) wide section views: visible width >= ~47 (west 66 / mid 48 / east
-  //     61 — identical on phone and desktop; the desktop default stays
-  //     label-free because zoomFade is ~0 there, and prox covers it too).
-  // (B) the island close-up: zoomed to q >= ~1.16 vs the default AND
-  //     centred far from the default centre (distC >= ~35). One or two
-  //     pinches from the default (q <= ~2, distC <= ~22 even when the pinch
-  //     is anchored on the island) reach neither band, so no labels.
+  // close-up. Labels therefore show only in the island close-up band:
+  // zoomed to q >= ~1.16 vs the default AND centred far from the default
+  // centre (distC >= ~35). One or two pinches from the default (q <= ~2,
+  // distC <= ~22 even when the pinch is anchored on the island) reach
+  // neither condition, so no labels.
+  // 2026-11-28 20:05 (user: "缩小的时候为什么二级按钮还会出现？
+  // 不应该是只放大才会出现吗？"): there used to be a second band (A:
+  // wide section views, visible width >= ~47 — west 66 / mid 48 / east
+  // 61) that showed every label whenever the view was WIDE, i.e. exactly
+  // when zoomed OUT. The user's screenshot (visW ~62) had bandA=1,
+  // labelOp=1 and 12 gate-driven labels on screen. That band is removed:
+  // zooming out now hides the labels; they only appear in the close-up
+  // band above. Section views (西段/中段/东段 buttons) now show only the
+  // always-on labels (mid/east + facility, see below), which the user
+  // explicitly wants to keep.
   // Dots are untouched (all 46 spots have a dot); the labels' opacity
   // rides on --labelOp, set every frame here, so the fade follows the
   // camera with no pop and no CSS-transition lag.
@@ -1181,23 +1188,25 @@ function positionMarkers(){
   const distC=Math.max(Math.abs(cam.cx-dp.cx),Math.abs(cam.cy-dp.cy));
   const prox=Math.max(0,1-distC/8)*Math.max(0,1-Math.abs(cam.z-dp.z)/(0.35*dp.z));
   const ss=(x,a,b)=>{const t=Math.max(0,Math.min(1,(x-a)/(b-a)));return t*t*(3-2*t);};
-  const visW=CW/cam.z;
   const q=cam.z/dp.z;
-  const bandA=ss(visW,42,47); // wide section views
-  const bandB=ss(q,1.05,1.16)*ss(distC,25,35); // island close-up
-  const gate=Math.max(bandA,bandB);
+  const bandB=ss(q,1.05,1.16)*ss(distC,25,35); // island close-up (the only label band left; bandA, the wide/zoomed-out band, was removed 2026-11-28 20:05 — see above)
+  const gate=bandB;
   let labelOp=zoomFade*(1-prox)*gate;
   // 2026-11-28 double-label fix ("放大的时候文字标注会出现两次"):
-  // labels live in TWO separate bands (A: wide section views, B: island
-  // close-up) with a dead zone between them, so one continuous zoom-in
-  // from a section view to an island showed the labels, hid them, then
-  // showed them again — the user reads that as "appears twice". (Checked:
-  // no literal double rendering exists — one span per marker, no duplicate
-  // names, no canvas text — at z 5.9/21/40/100 every label draws once.)
+  // labels used to live in TWO separate bands (A: wide section views, B:
+  // island close-up) with a dead zone between them, so one continuous
+  // zoom-in from a section view to an island showed the labels, hid them,
+  // then showed them again — the user reads that as "appears twice".
+  // (Checked: no literal double rendering exists — one span per marker, no
+  // duplicate names, no canvas text — at z 5.9/21/40/100 every label draws
+  // once.) Band A was removed 2026-11-28 20:05 (see above), so there is
+  // only one band now; the hold below is kept so labels that were on at a
+  // gesture's start stay on (at 0.6) while the fingers are down, instead
+  // of flickering off mid-gesture.
   // While a gesture is in progress, labels that were on at its start stay
-  // on (hold at 0.6), bridging the dead zone; the normal gate/prox logic
-  // resumes the moment the fingers lift, so the settled states are
-  // unchanged (overview and one-pinch-from-default still show no labels).
+  // on (hold at 0.6); the normal gate/prox logic resumes the moment the
+  // fingers lift, so the settled states are unchanged (overview and
+  // one-pinch-from-default still show no labels).
   if(labelHold) labelOp=Math.max(labelOp,0.6);
   // 2026-11-28 label switch ("加个开关"): OFF hides the label text at
   // every zoom level — dots/number pins are untouched (they are not gated
@@ -1210,7 +1219,7 @@ function positionMarkers(){
   // "路口出口码头游客中心这些标注一直要出现" + "入口"): a spot whose name
   // matches _facRe (dock / ferry / visitor centre / exit / junction /
   // entrance), in any section. Either rule bypasses the zoom gate /
-  // bandA-bandB / prox rules entirely: such labels show at any zoom — but
+  // bandB / prox rules entirely: such labels show at any zoom — but
   // the 文字 switch still hides them (OFF wins, same as west), and the
   // greedy declutter below still hides any that would overlap another
   // label. Their span opacity is set per-marker (--labelOp on the button
@@ -1338,14 +1347,16 @@ $('#listX').addEventListener('click',()=>$('#list').classList.remove('show'));
 // intro, location; click a row -> popup with 高德导航 by Amap NAME
 // search). Distances are haversine STRAIGHT-LINE from the fixed
 // 峒那屿湾 centre (107.038,22.713) — never driving time, never GPS.
-// Fixed order (nearest first). Coordinates: 德天瀑布/伏那秘境/剑龙山
-// from the 剑龙山 NEARBY data; 明仕田园 from the Amap place page
-// (106.9226,22.7043, 国家4A级).
+// 2026-11-28 20:01 (user): 3 entries in this fixed order — 明仕那里
+// 酒店 (first entry of the 剑龙山 panel, reference screenshot), 伏那秘境,
+// 剑龙山 (intro per user: "四峰一脊 · 东侧伏曼龙潭！"); 德天瀑布 and
+// 明仕田园 removed. Coordinates all from the 剑龙山 NEARBY data
+// (v2.11.30): hotel (106.9266,22.7120) -> ~11.4 km from 峒那屿湾 centre
+// (NOT the 50.5 km in the reference, which is from 剑龙山）.
 const NEARBY=[
-  {name:'明仕田园',lon:106.9226,lat:22.7043,icon:'🌾',grade:'国家 4A 级',intro:'喀斯特峰林田园风光，明仕河竹筏、稻田花海，《花千骨》取景地。',loc:'大新县堪圩乡明仕村'},
+  {name:'明仕那里酒店',lon:106.9266,lat:22.7120,icon:'🏨',grade:'',intro:'那里酒店社区饭堂，稻田泳池、落地窗推窗即景，明仕田园旁的度假住宿。',loc:'大新县堪圩乡明仕村'},
   {name:'伏那秘境',lon:107.02,lat:22.86,icon:'🌲',grade:'',intro:'喀斯特水上森林，雨林秘境穿越，丁达尔光森林漂流。',loc:'大新县恩城乡，恩城国家自然保护区内'},
-  {name:'德天瀑布',lon:106.72278,lat:22.85583,icon:'💧',grade:'国家 5A 级',intro:'亚洲第一、世界第四大跨国瀑布，与越南板约瀑布相连，总宽 208 米。',loc:'大新县硕龙镇德天村，中越边境归春河上'},
-  {name:'剑龙山',lon:107.0365,lat:23.1550,icon:'⛰️',grade:'',intro:'登山环线穿四峰，伏曼水库环线，剑龙山3D导视图同款景区。',loc:'崇左市天等县'},
+  {name:'剑龙山',lon:107.0365,lat:23.1550,icon:'⛰️',grade:'',intro:'四峰一脊 · 东侧伏曼龙潭！',loc:'崇左市天等县'},
 ];
 const DNYW_CENTER={lon:107.038,lat:22.713}; // 峒那屿湾景区中心 (same value 剑龙山 uses for 峒那屿湾）
 function nearbyDistM(aLon,aLat,bLon,bLat){
@@ -1574,6 +1585,22 @@ stage.addEventListener('wheel',e=>{e.preventDefault();
 // ---- main loop: dt-based damping + inertia + ground-cache refresh + draw ----
 let lastGoodCam=null; // last known-good camera (per frame, when valid)
 function tick(now){
+  // 2026-11-28 WeChat fix ("微信里点开链接，位置全部跑偏"): the page
+  // only re-measured its size on window.resize, but in WeChat the webview
+  // height changes after load (native top/bottom bars settle) without a
+  // resize the page can rely on. The canvas bitmap and CW/CH then stay at
+  // the load-time height while the stage is actually shorter: the bitmap
+  // is squashed by CSS, the markers (positioned from the stale height)
+  // land below the ground features, error growing with screen y (top
+  // nearly aligned, ~70-100 px off at the bottom — reproduced: stage 720
+  // vs bitmap 844, predicted offset up to 67 px at the visible dots).
+  // The old selftest could not catch it (dotDev compares markers against
+  // toScreen, which uses the same stale size). So check the size every
+  // frame and re-run resize() the moment it differs: self-healing for any
+  // size change, whatever event (or none) caused it. resize() is
+  // idempotent (it only re-allocates the bitmaps and invalidates the
+  // ground cache) and only runs when the size actually changed.
+  if(stage.clientWidth!==CW||stage.clientHeight!==CH) resize();
   const dt=Math.min(0.05,((now-lastT)||16)/1000); lastT=now;
   // 2026-11-28 white-canvas safety net: if any camera field ever goes
   // non-finite (bad pointer data, a NaN from a gesture) or the zoom escapes
@@ -1591,7 +1618,17 @@ function tick(now){
     cam.tx=lastGoodCam.tx;cam.ty=lastGoodCam.ty;cam.tz=lastGoodCam.tz;cam.trot=lastGoodCam.trot;
     cam.vx=cam.vy=cam.vrot=0;
   }
-  // inertia: the target keeps sliding, friction decays the velocity
+  // inertia: the target keeps sliding, friction decays the velocity.
+  // 2026-11-28 "移动起来太滑了": the old decay (3.2/s, tau ~0.31 s) let
+  // a moderate flick (200 px in ~150 ms) glide ~127 screen px and keep
+  // sliding ~1.4 s after release; a hard flick glided ~191 px / ~1.6 s.
+  // Friction is now 15/s (tau 0.067 s): the same moderate flick glides
+  // ~27 px and stops in ~0.5 s, a hard flick ~41 px / ~0.5 s — the map
+  // stops promptly after release instead of running away, but still keeps
+  // a short hint of momentum so it does not feel dead. (10/s was tried
+  // first: 43 px / 0.65 s — still a touch glidey.) The 0.6 release
+  // multiplier and the 150 units/s cap are unchanged; the 1:1 finger
+  // follow during the drag (cam set directly) is untouched.
   if(cam.vx||cam.vy){
     cam.tx+=cam.vx*dt; cam.ty+=cam.vy*dt;
     // pan clamp: inertia stops at the edge instead of flinging the map off
@@ -1600,7 +1637,7 @@ function tick(now){
     if((_ic[0]<cam.tx&&cam.vx>0)||(_ic[0]>cam.tx&&cam.vx<0))cam.vx=0;
     if((_ic[1]<cam.ty&&cam.vy>0)||(_ic[1]>cam.ty&&cam.vy<0))cam.vy=0;
     cam.tx=_ic[0]; cam.ty=_ic[1];
-    const dec=Math.exp(-dt*3.2); cam.vx*=dec; cam.vy*=dec;
+    const dec=Math.exp(-dt*15); cam.vx*=dec; cam.vy*=dec;
     if(Math.hypot(cam.vx,cam.vy)<0.4){cam.vx=cam.vy=0;}
   }
   // rotation is gone (2026-11-28): rot/trot/vrot are pinned at 0, no
@@ -1667,6 +1704,11 @@ resize();
 fitAll(false);
 document.getElementById('logoImg').src=D.logo; // official logo, top-left
 window.addEventListener('resize',resize);
+// WeChat/iOS: visual-viewport changes (toolbar show/hide) do not always
+// fire a window resize — listen to the visual viewport too (same WeChat
+// fix as the per-frame check in tick(); only re-measures when the size
+// actually changed, so it never does redundant work).
+if(window.visualViewport) window.visualViewport.addEventListener('resize',()=>{if(stage.clientWidth!==CW||stage.clientHeight!==CH)resize();});
 requestAnimationFrame(t=>{lastT=t;requestAnimationFrame(tick);});
 setInterval(()=>{const p=ringAt(boats[0].t);
   document.querySelector('#selftest').dataset.boat=p[0].toFixed(1)+','+p[1].toFixed(1);},500);

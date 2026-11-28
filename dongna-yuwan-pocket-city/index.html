@@ -796,30 +796,21 @@ function screenToPlane(sx,sy){
   return [(sx-CW/2)/cam.z+cam.cx,(sy-CH/2)/cam.z+cam.cy];
 }
 function spotScreen(s){return toScreen(s.x,s.y);}
-function defaultParams(){
-  // the default (overview) view: content centre + the tightened zoom
-  // (2026-11-28: the old fit-all left the middle mostly empty on portrait
-  // phones (band ~14% of height). Now the content fills ~75% of the screen
-  // height; the ends crop a little on narrow screens — pinch out to see
-  // the whole map). Shared by defaultView() and the label-visibility rule
-  // in positionMarkers(), so both agree on what "the overview" is.
-  // (2026-11-28: the 全景 button no longer uses this — it uses the true
-  // fit-all, the user's 21:08 reference. This stays the opening view.)
-  const fit=fitZoom();
-  const zT=Math.max(fit, Math.min(0.75*CH/(_cb.y1-_cb.y0), fit*8));
-  return {cx:(_cb.x0+_cb.x1)/2, cy:(_cb.y0+_cb.y1)/2, z:zT, fit};
-}
 function defaultView(animate){
-  const p=defaultParams();
-  setCam(p.cx, p.cy, p.z, animate);
+  // 2026-11-28 23:48 (user, from phone screenshot): the opening view is the
+  // true fit-all — the same view the 全景 button goes to (whole map as a thin
+  // band across the full width, west dots at the left edge, 千层红山 at the
+  // right edge). Was the tightened middle close-up (defaultParams, z=13.391).
+  // On portrait phones the map is a horizontal band with blank space above
+  // and below — that is the requested look, not a bug.
+  fitAll(animate);
 }
 function fitAll(animate){
   // 2026-11-28: the 全景 button's view is the true fit-all (the user's
   // 21:08 reference: the whole map as a thin band across the full width,
   // west dots at the left edge, 千层红山 at the right edge) — content
-  // centre + fitZoom(). The default opening view stays the tightened
-  // overview (defaultView/defaultParams, middle close-up); it is no
-  // longer the same as the 全景 view.
+  // centre + fitZoom(). Since 2026-11-28 23:48 this is also the opening
+  // view (defaultView calls fitAll).
   setCam((_cb.x0+_cb.x1)/2,(_cb.y0+_cb.y1)/2,fitZoom(),animate);
 }
 function setCam(cx,cy,z,animate){
@@ -1201,12 +1192,11 @@ const _secMidX=(D.views.west.plane[0]+D.views.mid.plane[0])/2;
 // are at fit*2.11/2.9/2.28, so fit*1.5 sits cleanly below them.
 // 2026-11-28 (r19 follow-up): the old second rule — "sitting on the
 // default overview also counts as 全景" — is gone. The 全景 button now
-// goes to the true fit-all (z=2.798) while the default opening
-// view is the middle close-up (z=13.391, centre x≈68, i.e. in the mid
-// section), so that rule wrongly showed 全景 at startup. The green now
-// follows the camera's actual position only: startup → 中段,
-// tap 全景 (fit-all) → 全景. (2026-11-28 23:00: the 复位 button is gone,
-// so there is no "reset → 中段" rule any more.)
+// goes to the true fit-all (z=2.798), and since 2026-11-28 23:48 the
+// default opening view is the same fit-all, so startup → 全景. The green
+// follows the camera's actual position only: tap 全景 (fit-all) → 全景.
+// (2026-11-28 23:00: the 复位 button is gone, so there is no
+// "reset → 中段" rule any more.)
 const _secEastX=(D.views.mid.plane[0]+D.views.east.plane[0])/2;
 function currentSection(){
   const fit=fitZoom();

@@ -73,9 +73,12 @@ button:focus-visible,a:focus-visible{outline:2px solid var(--gold);outline-offse
 #nearby header button{margin-left:auto;font-size:20px;color:var(--muted);padding:2px 8px}
 #nearby .note{padding:0 16px 8px;font-size:12px;color:var(--muted)}
 #nearby .rows{overflow-y:auto;padding:0 8px 16px}
-.nrow{padding:11px 8px;border-bottom:1px solid #e3ddc8;cursor:pointer;border-radius:10px}
+.nrow{padding:11px 8px;border-bottom:1px solid #e3ddc8;border-radius:10px}
 .nrow:last-child{border-bottom:0}
 .nrow:hover{background:#f2efe2}
+.nact{display:flex;gap:8px;flex-wrap:wrap;margin-top:9px}
+.nnav{display:inline-block;background:var(--green);color:#fff;font-weight:700;font-size:13px;padding:7px 13px;border-radius:999px;text-decoration:none}
+.ncall{display:inline-block;border:1.5px solid var(--green);color:var(--green);font-weight:700;font-size:13px;padding:6px 12px;border-radius:999px;text-decoration:none}
 .nhead{display:flex;align-items:baseline;gap:8px}
 .nico{font-size:16px;flex:none}
 .nname{font-weight:700;font-size:15px;color:var(--ink)}
@@ -1344,19 +1347,28 @@ $('#listBtn').addEventListener('click',()=>{$('#list').classList.add('show');$('
 $('#listX').addEventListener('click',()=>$('#list').classList.remove('show'));
 // 2026-11-28 19:18 (user): 附近景区推荐 — same form as 剑龙山 v2.11.30
 // (top-bar pill button + slide-in panel; rows: icon + name + distance,
-// intro, location; click a row -> popup with 高德导航 by Amap NAME
-// search). Distances are haversine STRAIGHT-LINE from the fixed
+// intro, location). Distances are haversine STRAIGHT-LINE from the fixed
 // 峒那屿湾 centre (107.038,22.713) — never driving time, never GPS.
-// 2026-11-28 20:01 (user): 3 entries in this fixed order — 明仕那里
-// 酒店 (first entry of the 剑龙山 panel, reference screenshot), 伏那秘境,
-// 剑龙山 (intro per user: "四峰一脊 · 东侧伏曼龙潭！"); 德天瀑布 and
-// 明仕田园 removed. Coordinates all from the 剑龙山 NEARBY data
-// (v2.11.30): hotel (106.9266,22.7120) -> ~11.4 km from 峒那屿湾 centre
-// (NOT the 50.5 km in the reference, which is from 剑龙山）.
+// 2026-11-28 20:27 (user): 4 entries in this fixed order — 明仕那里酒店,
+// 伏那秘境, 剑龙山 (intro per user: "四峰一脊 · 东侧伏曼龙潭！"), 德天瀑布.
+// Each row has a "立即导航" button (Amap navigation URI with the place's
+// WGS-84 coords + name, straight into route planning — NOT a name search)
+// and a 📞 phone icon (tel: link). Row click no longer opens a popup;
+// the nearby popup (openNearby) was removed. Phone numbers verified online
+// 2026-11-28 (multi-source): hotel 0771-5453777 (Ctrip/huochecha/Amap;
+// also 0771-3751800, 19978119299), 伏那秘境 19978119866 (大新县政府国庆
+// 提示 / Ctrip 票务咨询 / Qunar 官方联系电话）, 剑龙山 0771-6467699
+// (Qunar 官方联系电话 / Trip.com), 德天瀑布 0771-3690199 (official site
+// ctgdetian.com 景区咨询 / 广西政府网 / Ctrip 服务中心；票务 400-9898-978).
+// Coordinates all from the 剑龙山 NEARBY data (v2.11.30): hotel
+// (106.9266,22.7120) -> ~11.4 km, 德天瀑布 (106.72278,22.85583) -> ~36.0 km
+// from 峒那屿湾 centre (NOT the 50.5 km in the reference screenshot,
+// which is measured from 剑龙山）.
 const NEARBY=[
-  {name:'明仕那里酒店',lon:106.9266,lat:22.7120,icon:'🏨',grade:'',intro:'那里酒店社区饭堂，稻田泳池、落地窗推窗即景，明仕田园旁的度假住宿。',loc:'大新县堪圩乡明仕村'},
-  {name:'伏那秘境',lon:107.02,lat:22.86,icon:'🌲',grade:'',intro:'喀斯特水上森林，雨林秘境穿越，丁达尔光森林漂流。',loc:'大新县恩城乡，恩城国家自然保护区内'},
-  {name:'剑龙山',lon:107.0365,lat:23.1550,icon:'⛰️',grade:'',intro:'四峰一脊 · 东侧伏曼龙潭！',loc:'崇左市天等县'},
+  {name:'明仕那里酒店',lon:106.9266,lat:22.7120,icon:'🏨',grade:'',phone:'0771-5453777',intro:'那里酒店社区饭堂，稻田泳池、落地窗推窗即景，明仕田园旁的度假住宿。',loc:'大新县堪圩乡明仕村'},
+  {name:'伏那秘境',lon:107.02,lat:22.86,icon:'🌲',grade:'',phone:'19978119866',intro:'喀斯特水上森林，雨林秘境穿越，丁达尔光森林漂流。',loc:'大新县恩城乡，恩城国家自然保护区内'},
+  {name:'剑龙山',lon:107.0365,lat:23.1550,icon:'⛰️',grade:'',phone:'0771-6467699',intro:'四峰一脊 · 东侧伏曼龙潭！',loc:'崇左市天等县'},
+  {name:'德天瀑布',lon:106.72278,lat:22.85583,icon:'💧',grade:'',phone:'0771-3690199',intro:'亚洲第一、世界第四大跨国瀑布，与越南板约瀑布相连，总宽 208 米。',loc:'大新县硕龙镇德天村，中越边境归春河上'},
 ];
 const DNYW_CENTER={lon:107.038,lat:22.713}; // 峒那屿湾景区中心 (same value 剑龙山 uses for 峒那屿湾）
 function nearbyDistM(aLon,aLat,bLon,bLat){
@@ -1366,7 +1378,7 @@ function nearbyDistM(aLon,aLat,bLon,bLat){
   return 2*R*Math.asin(Math.sqrt(h));
 }
 function nearbyFmt(m){return m<1000?'约 '+Math.round(m)+' 米':'约 '+(m/1000).toFixed(1)+' 公里';}
-function nearbyNavUrl(name){return 'https://uri.amap.com/search?keyword='+encodeURIComponent(name);}
+function nearbyNavUrl(s){return 'https://uri.amap.com/navigation?to='+s.lon+','+s.lat+','+encodeURIComponent(s.name)+'&mode=car&policy=1&src=mypage&coordinate=wgs84&callnative=1';}
 function nearbyRender(){
   const rows=$('#nearbyRows'); if(!rows) return;
   rows.innerHTML='';
@@ -1374,22 +1386,9 @@ function nearbyRender(){
     const d=nearbyDistM(DNYW_CENTER.lon,DNYW_CENTER.lat,s.lon,s.lat);
     const row=document.createElement('div');
     row.className='nrow';
-    row.innerHTML='<div class="nhead"><span class="nico">'+s.icon+'</span><span class="nname">'+s.name+'</span><span class="ndist">'+nearbyFmt(d)+'</span></div><div class="nintro">'+s.intro+'</div><div class="nloc">'+s.loc+'</div>';
-    row.addEventListener('click',()=>openNearby(s,d));
+    row.innerHTML='<div class="nhead"><span class="nico">'+s.icon+'</span><span class="nname">'+s.name+'</span><span class="ndist">'+nearbyFmt(d)+'</span></div><div class="nintro">'+s.intro+'</div><div class="nloc">'+s.loc+'</div><div class="nact"><a class="nnav" href="'+nearbyNavUrl(s)+'" target="_blank" rel="noopener">🧭 立即导航</a>'+(s.phone?'<a class="ncall" href="tel:'+s.phone.replace(/-/g,'')+'">📞 '+s.phone+'</a>':'')+'</div>';
     rows.appendChild(row);
   });
-}
-function openNearby(s,d){
-  clearRoute();
-  $('#cardT').textContent=s.name;
-  $('#cardTag').textContent=(s.grade?s.grade+' · ':'')+nearbyFmt(d)+'（直线距离）';
-  $('#cardP').innerHTML=s.intro+'<br>位置：'+s.loc;
-  const cr=$('#cardR');
-  cr.style.display='block';
-  cr.innerHTML='<a href="'+nearbyNavUrl(s.name)+'" target="_blank" rel="noopener">🧭 高德导航</a>';
-  $('#nearby').classList.remove('show');
-  $('#nearbyBtn').classList.remove('on');
-  $('#card').classList.add('show');
 }
 $('#nearbyBtn').addEventListener('click',()=>{
   const p=$('#nearby'), open=!p.classList.contains('show');

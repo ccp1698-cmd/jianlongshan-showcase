@@ -351,28 +351,48 @@ function drawBridge(b){
     }
   }
 }
+function drawCubeTree(cx,cyTop,R,pal){
+  // one isometric cube: light top, mid left, dark right face
+  const H=R*0.9;
+  gctx.fillStyle=pal[0];
+  gctx.beginPath(); gctx.moveTo(cx,cyTop-R*0.5); gctx.lineTo(cx+R,cyTop); gctx.lineTo(cx,cyTop+R*0.5); gctx.lineTo(cx-R,cyTop); gctx.closePath(); gctx.fill();
+  gctx.fillStyle=pal[1];
+  gctx.beginPath(); gctx.moveTo(cx-R,cyTop); gctx.lineTo(cx,cyTop+R*0.5); gctx.lineTo(cx,cyTop+R*0.5+H); gctx.lineTo(cx-R,cyTop+H); gctx.closePath(); gctx.fill();
+  gctx.fillStyle=pal[2];
+  gctx.beginPath(); gctx.moveTo(cx,cyTop+R*0.5); gctx.lineTo(cx+R,cyTop); gctx.lineTo(cx+R,cyTop+H); gctx.lineTo(cx,cyTop+R*0.5+H); gctx.closePath(); gctx.fill();
+}
 function drawTree(t){
-  // forest-healing style: round fluffy canopies, layered deep/light green,
-  // pink flowering trees; spruce is a soft rounded cone, not a sharp spike.
-  const s=flat(t[0],t[1]), r=(4.5+t[3]*3.5);
+  // low-poly cube tree (reference: WeChat article "寻找景区地图制作工具",
+  // 2026-11-28): isometric cube canopy (light top / mid left / dark right),
+  // thin brown trunk, soft elliptical ground shadow. Three size tiers from
+  // t[3]; green + pink (bloom) mix kept; spruce is a darker stacked double
+  // cube, like the cube-on-cube trees in the reference.
+  const s=flat(t[0],t[1]);
+  const tier=t[3]<1.1?0:(t[3]<1.4?1:2);
+  const R=[4.8,6.0,7.2][tier];
+  const H=R*0.9, th=R*0.85;
+  const cx=s[0], base=s[1];
+  // soft ground shadow, offset down-right (light from upper-left)
+  const shx=cx+R*0.35, shy=base+R*0.30;
+  gctx.save(); gctx.translate(shx,shy); gctx.scale(1,0.42);
+  const gr=gctx.createRadialGradient(0,0,0,0,0,R*1.2);
+  gr.addColorStop(0,'rgba(46,80,52,0.20)'); gr.addColorStop(1,'rgba(46,80,52,0)');
+  gctx.fillStyle=gr;
+  gctx.beginPath(); gctx.arc(0,0,R*1.2,0,7); gctx.fill(); gctx.restore();
+  // thin trunk
+  const top=base-th;
+  gctx.strokeStyle='#6b4a2f'; gctx.lineWidth=Math.max(1.2,R*0.26); gctx.lineCap='round';
+  gctx.beginPath(); gctx.moveTo(cx,base); gctx.lineTo(cx,top); gctx.stroke();
+  const pal=t[2]==='bloom'?['#f9d3dc','#f2b7c6','#e89bb0']
+    :t[2]==='spruce'?['#6ab877','#3f8a52','#2e6b3f']
+    :['#8ccb8e','#5aa86a','#3f8a52'];
+  const cyTop=top-R*0.5-H;
   if(t[2]==='spruce'){
-    gctx.fillStyle='#2e6b3f';
-    gctx.beginPath(); gctx.arc(s[0],s[1]-r*0.7,r*0.95,0,7); gctx.fill();
-    gctx.fillStyle='#3f8a52';
-    gctx.beginPath(); gctx.arc(s[0],s[1]-r*1.25,r*0.75,0,7); gctx.fill();
-    gctx.fillStyle='#6ab877';
-    gctx.beginPath(); gctx.arc(s[0],s[1]-r*1.75,r*0.5,0,7); gctx.fill();
-    gctx.fillStyle='#5d4a33'; gctx.fillRect(s[0]-1,s[1]+r*0.2,2,r*0.6);
+    drawCubeTree(cx,cyTop,R,pal);
+    const r2=R*0.62, cyTop2=cyTop-r2*0.5-r2*0.9;
+    drawCubeTree(cx,cyTop2,r2,pal);
   } else {
-    const bloom=t[2]==='bloom';
-    gctx.fillStyle=bloom?'#e89bb0':'#3f8a52';
-    gctx.beginPath(); gctx.arc(s[0],s[1]-r*0.8,r,0,7); gctx.fill();
-    gctx.fillStyle=bloom?'#f2b7c6':'#5aa86a';
-    gctx.beginPath(); gctx.arc(s[0]-r*0.35,s[1]-r*1.0,r*0.68,0,7); gctx.fill();
-    gctx.fillStyle=bloom?'#f9d3dc':'#8ccb8e';
-    gctx.beginPath(); gctx.arc(s[0]+r*0.3,s[1]-r*1.15,r*0.5,0,7); gctx.fill();
-    gctx.strokeStyle='#5d4a33'; gctx.lineWidth=1.4;
-    gctx.beginPath(); gctx.moveTo(s[0],s[1]+r*0.3); gctx.lineTo(s[0],s[1]-r*0.6); gctx.stroke();
+    drawCubeTree(cx,cyTop,R,pal);
   }
 }
 function drawHouseAt(s,w,hgt,roof,wall){
@@ -432,7 +452,7 @@ function drawProp(p){
   if(kind==='aqua'){ gctx.strokeStyle='#9a8a6a'; gctx.lineWidth=3; gctx.beginPath(); gctx.moveTo(s[0]-12,s[1]-6); gctx.lineTo(s[0]+12,s[1]-6); gctx.stroke(); return; }
   if(kind==='palms'){ for(let i=-1;i<2;i++){const px=s[0]+i*8; gctx.strokeStyle='#5d4a33'; gctx.lineWidth=1.6;
     gctx.beginPath(); gctx.moveTo(px,s[1]); gctx.lineTo(px,s[1]-9); gctx.stroke();
-    gctx.fillStyle='#4e8a54'; gctx.beginPath(); gctx.arc(px,s[1]-11,4.5,0,7); gctx.fill();} return; }
+    drawCubeTree(px,s[1]-9-4.5*0.5-4.5*0.9,4.5,['#8ccb8e','#5aa86a','#3f8a52']);} return; }
   if(kind==='mound'){ gctx.fillStyle='#6aa86a'; gctx.beginPath(); gctx.ellipse(s[0],s[1]-2,13,6,0,0,7); gctx.fill(); return; }
   drawHouseAt(s,7,6,'#3a3a3a','#fffdf6');
 }

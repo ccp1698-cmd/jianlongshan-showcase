@@ -264,8 +264,36 @@ function renderGroundInto(vctx,T){
     gctx.closePath();
   }
   gctx.fill('evenodd');
+  // 2026-11-28 shallow-water band along every shore (user 20:43 "河岸的边
+  // 是不是要加点效果？感觉太平面化了", 20:45 "那些岛和小岛屿的边应该也要
+  // 加吧"): a pale-teal band hugging the waterline from the water side, so
+  // the bank reads as shallow water instead of a flat cut. Clip to the
+  // water just filled (the same evenodd river path), then stroke the river
+  // loops and every island outline wide — the half of each stroke that
+  // would fall on land/paper is clipped away, so only the in-water band
+  // shows and the land stays clean. Same treatment for the river banks
+  // and all 15 islands (big and small islets alike), so the effect is
+  // consistent. Solid colour, not alpha: the river-loop island holes and
+  // the island outlines trace (nearly) the same shores, and a solid colour
+  // double-paints to the same tone. The thin white shoreline stroke below
+  // stays on top for the crisp waterline.
+  gctx.save();
+  gctx.clip('evenodd');
+  gctx.strokeStyle=shade(RIVER_BLUE,1.3); gctx.lineWidth=12; gctx.lineJoin='round'; gctx.lineCap='round';
+  gctx.stroke(); // river loops (path still current from the fill)
+  for(const isl of Object.values(D.islands)){
+    gctx.beginPath();
+    isl.forEach((p,i)=>{const s=flat(p[0],p[1]); i?gctx.lineTo(s[0],s[1]):gctx.moveTo(s[0],s[1]);});
+    gctx.closePath(); gctx.stroke();
+  }
+  gctx.restore();
   // soft white highlight along the water's edge (forest-healing style)
   gctx.strokeStyle='rgba(255,255,255,0.55)'; gctx.lineWidth=1.6;
+  gctx.beginPath();
+  for(const lp of D.riverPath){
+    lp.forEach((p,i)=>{const s=flat(p[0],p[1]); i?gctx.lineTo(s[0],s[1]):gctx.moveTo(s[0],s[1]);});
+    gctx.closePath();
+  }
   gctx.stroke();
   // 2026-11-28 terrain (KML3): the river already contains the north arm
   // (the 4 KML3 bank lines), so 文阁桥 is on water by construction and
@@ -307,19 +335,31 @@ function renderGroundInto(vctx,T){
     strokePath(pts,'#b0a184',18); // warm-grey pavement (flat, no border)
     strokePath(pts,'#e8b923',1.3,[7,6]); // dashed yellow centre line
   }
-  drawHighway(D.road);
-  // trails: warm earth-yellow (forest-healing style). KML2 footpaths
-  // (kml-trail-*) are narrow; the entrance spur (kml-roadspur, KML2 大路
-  // 13 pts) is a 大路, so it gets the highway treatment too — the cars
-  // still run the through road (D.road) only.
+  // trails FIRST, highway after (2026-11-28, user 20:47 "大陆是不是要把小
+  // 路给压着！不然凸出来太难看了"): the two footpaths by the entrance come
+  // down from the north and end on the highway centreline, but because the
+  // trails used to be drawn AFTER the highway, their round ends sat on top
+  // of the pavement and read as poking out the far side into the paper.
+  // Now the highway is painted over them, so a trail disappears under the
+  // pavement and reads as joining it. Every trail in the data ends on the
+  // highway centreline (checked 2026-11-28: all 22 thin trails, end
+  // distance to the centreline 0.00-0.15 units, none crosses it), so this
+  // covers the whole map, not just the two in the red circle. The entrance
+  // spur (kml-roadspur, KML2 大路 13 pts) is a 大路, so it gets the highway
+  // treatment too, drawn with the highway below — the cars still run the
+  // through road (D.road) only.
   for(const [id,pts] of Object.entries(D.trails)){
-    if(id==='kml-roadspur'){ drawHighway(pts); continue; }
+    if(id==='kml-roadspur') continue; // a 大路 — drawn with the highway below
     // 2026-11-28 user ("大路和小路的样式都不要有边"): no border — the old
     // 2-stroke stack (dark edge #a08a68 4 -> light surface #f2d492 2.2) is
     // now just the flat surface, widened 2.2->4 so the footpath keeps its
     // approved width; only the border is gone.
     strokePath(pts,'#f2d492',4);
   }
+  // main road after the trails, so its pavement covers the trail tails
+  // (see the note above).
+  drawHighway(D.road);
+  if(D.trails['kml-roadspur']) drawHighway(D.trails['kml-roadspur']);
   // bridges (top-down: deck line + suspension towers; warm brown wood)
   for(const b of D.bridges) drawBridge(b);
   gctx=null;
@@ -1147,6 +1187,40 @@ window.DONGNA={
 // gap there (west ends 44.5, mid starts 61.2), so the split is unambiguous.
 // See the note in positionMarkers().
 const _secMidX=(D.views.west.plane[0]+D.views.mid.plane[0])/2;
+// ---- dock section indicator follows the map (2026-11-28, user 20:42
+// "下面底栏的西段中段东段！我手动移动地图的话移到哪个段？下面的绿色底
+// 会移到哪个段"): the green (.on) used to move only when a section button
+// was tapped. Now it follows the camera every frame — drag, pinch, wheel,
+// inertia glide and button taps all update it. Section from the camera
+// TARGET (tx/ty/tz), not the damped actual position, so during a flyTo the
+// green sits on the destination at once (no mid-flight flicker through the
+// section being crossed), during a drag it tracks the finger 1:1, and
+// during the release glide it follows the inertia to its resting section.
+// Boundaries are the existing section-view definitions, not redrawn: the
+// west/mid split is _secMidX (51.25, midpoint of the west and mid view
+// centres — the same split the label rules use), the mid/east split is
+// _secEastX (97.5, midpoint of the mid and east view centres). 全景 when
+// the camera is zoomed out to (near) the fit-all level — the section views
+// are at fit*2.11/2.9/2.28, so fit*1.5 sits cleanly below them — or when
+// it is sitting on the default overview itself (the 全景 button's view).
+const _secEastX=(D.views.mid.plane[0]+D.views.east.plane[0])/2;
+function currentSection(){
+  const fit=fitZoom();
+  if(cam.tz<=fit*1.5) return 'all';
+  const dp=defaultParams();
+  const dx=Math.abs(cam.tx-dp.cx)/(CW/cam.tz);
+  if(dx<0.35&&Math.abs(Math.log(cam.tz/dp.z))<0.25) return 'all';
+  if(cam.tx<_secMidX) return 'west';
+  if(cam.tx<_secEastX) return 'mid';
+  return 'east';
+}
+let _curSec=null;
+function syncSectionBtn(){
+  const s=currentSection();
+  if(s===_curSec) return;
+  _curSec=s;
+  document.querySelectorAll('.dock [data-v]').forEach(x=>x.classList.toggle('on',x.dataset.v===s));
+}
 // facility labels always on (2026-11-28, user: "路口出口码头游客中心这些标注
 // 一直要出现" + "入口"): a spot whose name contains 码头/渡口/游客中心/出口/
 // 路口/入口. 9 spots match (no name contains 渡口 or 路口): 5 docks
@@ -1694,6 +1768,7 @@ function tick(now){
   }
   window.__cam={cx:+cam.cx.toFixed(2),cy:+cam.cy.toFixed(2),z:+cam.z.toFixed(3),rot:+cam.rot.toFixed(3),
     tx:+cam.tx.toFixed(2),ty:+cam.ty.toFixed(2),tz:+cam.tz.toFixed(3)};
+  syncSectionBtn(); // dock section green follows the camera (2026-11-28)
   requestAnimationFrame(tick);
 }
 // ---- boot ----
